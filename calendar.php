@@ -24,11 +24,10 @@ $events = [
 </head>
 
 <body class="bg-gray-100">
-    <?php include 'includes/sidebar.php'; ?>
-
     <div class="min-h-screen lg:ml-64">
         <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
+                <?php include 'includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Calendar</h1>
                 <a href="index.php" class="bg-white text-teal-600 px-3 py-2 rounded-lg font-medium hover:bg-gray-100 text-xs sm:text-sm">
                     Logout
@@ -48,7 +47,7 @@ $events = [
                             Monthly
                         </button>
                     </div>
-                    
+
                     <div class="flex items-center gap-3 w-full sm:w-auto">
                         <button onclick="previousPeriod()" class="bg-teal-700 hover:bg-teal-800 text-white px-3 py-2 rounded-lg">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,7 +68,7 @@ $events = [
 
                 <!-- Yearly View -->
                 <div id="yearlyView" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              
+
                 </div>
 
                 <!-- Monthly View -->
@@ -84,14 +83,14 @@ $events = [
                         <div class="text-center font-semibold text-sm text-gray-700 py-2">Sat</div>
                     </div>
                     <div id="monthlyCalendar" class="grid grid-cols-7 gap-2">
-                   
+
                     </div>
 
                     <!-- This Month's Events -->
                     <div class="mt-6">
                         <h3 class="text-lg font-semibold text-gray-800 mb-3">This Month's Events</h3>
                         <div id="monthEvents" class="space-y-2">
-                        
+
                         </div>
                         <div id="noEvents" class="text-gray-500 text-sm italic hidden">No events this month</div>
                     </div>
@@ -189,29 +188,29 @@ $events = [
     </div>
 
     <script>
-        
         let events = <?php echo json_encode($events); ?>;
         let currentView = 'yearly';
         let currentYear = 2025;
-        let currentMonth = 0; 
-        
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                           'July', 'August', 'September', 'October', 'November', 'December'];
+        let currentMonth = 0;
 
-       
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+
+
         document.addEventListener('DOMContentLoaded', function() {
             renderYearlyView();
         });
 
         function changeView(view) {
             currentView = view;
-            document.getElementById('viewYearlyBtn').className = view === 'yearly' 
-                ? 'bg-teal-700 text-white px-4 py-2 rounded-lg font-medium text-sm'
-                : 'bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm';
-            document.getElementById('viewMonthlyBtn').className = view === 'monthly'
-                ? 'bg-teal-700 text-white px-4 py-2 rounded-lg font-medium text-sm'
-                : 'bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm';
-            
+            document.getElementById('viewYearlyBtn').className = view === 'yearly' ?
+                'bg-teal-700 text-white px-4 py-2 rounded-lg font-medium text-sm' :
+                'bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm';
+            document.getElementById('viewMonthlyBtn').className = view === 'monthly' ?
+                'bg-teal-700 text-white px-4 py-2 rounded-lg font-medium text-sm' :
+                'bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm';
+
             if (view === 'yearly') {
                 document.getElementById('yearlyView').classList.remove('hidden');
                 document.getElementById('monthlyView').classList.add('hidden');
@@ -259,12 +258,12 @@ $events = [
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             let html = '';
 
-           
+
             for (let i = 0; i < firstDay; i++) {
                 html += '<div></div>';
             }
 
-          
+
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const hasEvent = events.some(e => dateStr >= e.start && dateStr <= e.end);
@@ -282,16 +281,16 @@ $events = [
             const firstDay = new Date(currentYear, currentMonth, 1).getDay();
             const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
 
-    
+
             for (let i = 0; i < firstDay; i++) {
                 container.innerHTML += '<div></div>';
             }
 
-           
+
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const dayEvents = events.filter(e => dateStr >= e.start && dateStr <= e.end);
-                
+
                 const dayDiv = document.createElement('div');
                 dayDiv.className = 'border border-gray-200 rounded-lg p-2 min-h-20 bg-white hover:bg-gray-50 transition-colors';
                 dayDiv.innerHTML = `
@@ -307,8 +306,8 @@ $events = [
         function renderMonthEvents() {
             const monthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
             const monthEnd = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-31`;
-            
-            const monthEvents = events.filter(e => 
+
+            const monthEvents = events.filter(e =>
                 (e.start >= monthStart && e.start <= monthEnd) ||
                 (e.end >= monthStart && e.end <= monthEnd) ||
                 (e.start <= monthStart && e.end >= monthEnd)
@@ -365,7 +364,7 @@ $events = [
             }
         }
 
-  //Modal1
+        //Modal1
         function openAddEventModal() {
             document.getElementById('addEventModal').classList.remove('hidden');
             document.getElementById('eventName').value = '';

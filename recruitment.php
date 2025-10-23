@@ -218,12 +218,12 @@ $to_evaluate = count(array_filter($applicants, fn($a) => $a['status'] === 'To Ev
             const department = document.getElementById('departmentFilter').value.toLowerCase();
             const status = document.getElementById('statusFilter').value;
             
-            // Update current status filter if status dropdown is used
+     
             if (status) {
                 currentStatusFilter = status;
             }
             
-            // Desktop table
+         
             const rows = document.querySelectorAll('#applicantTableBody tr');
             rows.forEach(row => {
                 const pos = row.cells[2].textContent.toLowerCase();
@@ -237,7 +237,7 @@ $to_evaluate = count(array_filter($applicants, fn($a) => $a['status'] === 'To Ev
                 row.style.display = (matchesPosition && matchesDept && matchesStatus) ? '' : 'none';
             });
 
-            // Mobile cards
+    
             const cards = document.querySelectorAll('.applicant-card');
             cards.forEach(card => {
                 const pos = card.dataset.position;
@@ -255,28 +255,28 @@ $to_evaluate = count(array_filter($applicants, fn($a) => $a['status'] === 'To Ev
         function filterByStatus(status) {
             currentStatusFilter = status;
             
-            // Clear other filters
+      
             document.getElementById('positionFilter').value = '';
             document.getElementById('departmentFilter').value = '';
             document.getElementById('statusFilter').value = status === 'all' ? '' : status;
             
-            // Apply filter
+   
             searchApplicants();
         }
 
         function addApplicant() {
-            alert('Add Applicant functionality - Will be implemented with backend');
+            alert('waiting 4 backend implementation');
         }
 
         function viewApplicant(id) {
-            alert('View Applicant: ' + id + ' - Will be implemented with backend');
+            alert('waiting 4 backend implementation');
         }
 
         function updateStatus(id) {
-            alert('Update Status: ' + id + ' - Will be implemented with backend');
+            alert('waiting 4 backend implementation');
         }
 
-        // Real-time search
+    
         document.getElementById('positionFilter').addEventListener('keyup', searchApplicants);
         document.getElementById('departmentFilter').addEventListener('keyup', searchApplicants);
         document.getElementById('statusFilter').addEventListener('change', searchApplicants);
