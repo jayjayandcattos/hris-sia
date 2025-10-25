@@ -26,7 +26,7 @@ body {
 
 
 .gradient-bg {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  background: linear-gradient(#009C8E, #00695F, #005048, #003631);
   position: relative;
   overflow: hidden;
 }

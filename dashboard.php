@@ -31,7 +31,7 @@ if (!isset($_SESSION['user_id'])) {
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Dashboard</h1>
-                <a href="index.php" class="bg-white text-teal-600 px-3 py-2 rounded-lg font-medium hover:bg-gray-100 text-xs sm:text-sm">
+                <a href="index.php" class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
                     Logout
                 </a>
             </div>
