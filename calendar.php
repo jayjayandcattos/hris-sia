@@ -5,16 +5,129 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Sample data aisgfhnbiahsjg
-$events = [
-    ['id' => 1, 'name' => 'Accreditation', 'start' => '2025-01-15', 'end' => '2025-01-17', 'color' => '#0d9488'],
-    ['id' => 2, 'name' => 'Team Building', 'start' => '2025-02-20', 'end' => '2025-02-20', 'color' => '#0d9488'],
-    ['id' => 3, 'name' => 'Company Anniversary', 'start' => '2025-03-10', 'end' => '2025-03-12', 'color' => '#0d9488'],
-];
+require_once 'config/database.php';
+
+$message = '';
+$messageType = '';
+
+// Handle form submissions
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (isset($_POST['action'])) {
+        switch ($_POST['action']) {
+            case 'add_event':
+                try {
+                    // Create recruitment event
+                    $sql = "INSERT INTO recruitment (job_title, department_id, date_posted, status, posted_by) 
+                            VALUES (?, ?, ?, 'Open', ?)";
+                    
+                    $stmt = $conn->prepare($sql);
+                    $success = $stmt->execute([
+                        $_POST['event_name'],
+                        $_POST['department_id'] ?: null,
+                        $_POST['event_start'],
+                        $_SESSION['employee_id']
+                    ]);
+                    
+                    if ($success) {
+                        if (isset($logger)) {
+                            $logger->info('CALENDAR', 'Event added', "Event: {$_POST['event_name']}");
+                        }
+                        echo json_encode(['success' => true, 'message' => 'Event added successfully']);
+                        exit;
+                    }
+                } catch (Exception $e) {
+                    if (isset($logger)) {
+                        $logger->error('CALENDAR', 'Failed to add event', $e->getMessage());
+                    }
+                    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                    exit;
+                }
+                break;
+                
+            case 'update_event':
+                try {
+                    $sql = "UPDATE recruitment 
+                            SET job_title = ?, department_id = ?, date_posted = ? 
+                            WHERE recruitment_id = ?";
+                    
+                    $stmt = $conn->prepare($sql);
+                    $success = $stmt->execute([
+                        $_POST['event_name'],
+                        $_POST['department_id'] ?: null,
+                        $_POST['event_start'],
+                        $_POST['event_id']
+                    ]);
+                    
+                    if ($success) {
+                        if (isset($logger)) {
+                            $logger->info('CALENDAR', 'Event updated', "ID: {$_POST['event_id']}");
+                        }
+                        echo json_encode(['success' => true, 'message' => 'Event updated successfully']);
+                        exit;
+                    }
+                } catch (Exception $e) {
+                    if (isset($logger)) {
+                        $logger->error('CALENDAR', 'Failed to update event', $e->getMessage());
+                    }
+                    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                    exit;
+                }
+                break;
+                
+            case 'delete_event':
+                try {
+                    $sql = "DELETE FROM recruitment WHERE recruitment_id = ?";
+                    $stmt = $conn->prepare($sql);
+                    $success = $stmt->execute([$_POST['event_id']]);
+                    
+                    if ($success) {
+                        if (isset($logger)) {
+                            $logger->info('CALENDAR', 'Event deleted', "ID: {$_POST['event_id']}");
+                        }
+                        echo json_encode(['success' => true, 'message' => 'Event deleted successfully']);
+                        exit;
+                    }
+                } catch (Exception $e) {
+                    if (isset($logger)) {
+                        $logger->error('CALENDAR', 'Failed to delete event', $e->getMessage());
+                    }
+                    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                    exit;
+                }
+                break;
+        }
+    }
+}
+
+// Fetch events from database
+$eventsSql = "SELECT r.recruitment_id as id, 
+              r.job_title as name, 
+              r.date_posted as start,
+              r.date_posted as end,
+              d.department_name
+              FROM recruitment r
+              LEFT JOIN department d ON r.department_id = d.department_id
+              ORDER BY r.date_posted DESC";
+
+$eventsData = fetchAll($conn, $eventsSql);
+$events = [];
+
+foreach ($eventsData as $event) {
+    $events[] = [
+        'id' => $event['id'],
+        'name' => $event['name'],
+        'start' => $event['start'],
+        'end' => $event['end'],
+        'color' => '#0d9488',
+        'department' => $event['department_name']
+    ];
+}
+
+// Fetch departments for dropdown
+$departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_name");
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,20 +135,25 @@ $events = [
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
 </head>
-
 <body class="bg-gray-100">
     <div class="min-h-screen lg:ml-64">
         <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Calendar</h1>
-                <a href="index.php" class="bg-white text-teal-600 px-3 py-2 rounded-lg font-medium hover:bg-gray-100 text-xs sm:text-sm">
+                <a href="logout.php" class="bg-white text-teal-600 px-3 py-2 rounded-lg font-medium hover:bg-gray-100 text-xs sm:text-sm">
                     Logout
                 </a>
             </div>
         </header>
 
         <main class="p-3 sm:p-4 lg:p-8">
+            <?php if ($message): ?>
+                <div class="mb-4 p-4 rounded-lg <?php echo $messageType === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
+                    <?php echo htmlspecialchars($message); ?>
+                </div>
+            <?php endif; ?>
+
             <!-- Calendar Controls -->
             <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6 mb-4 lg:mb-6">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
@@ -67,9 +185,7 @@ $events = [
                 </div>
 
                 <!-- Yearly View -->
-                <div id="yearlyView" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
-                </div>
+                <div id="yearlyView" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 
                 <!-- Monthly View -->
                 <div id="monthlyView" class="hidden">
@@ -82,16 +198,12 @@ $events = [
                         <div class="text-center font-semibold text-sm text-gray-700 py-2">Fri</div>
                         <div class="text-center font-semibold text-sm text-gray-700 py-2">Sat</div>
                     </div>
-                    <div id="monthlyCalendar" class="grid grid-cols-7 gap-2">
-
-                    </div>
+                    <div id="monthlyCalendar" class="grid grid-cols-7 gap-2"></div>
 
                     <!-- This Month's Events -->
                     <div class="mt-6">
                         <h3 class="text-lg font-semibold text-gray-800 mb-3">This Month's Events</h3>
-                        <div id="monthEvents" class="space-y-2">
-
-                        </div>
+                        <div id="monthEvents" class="space-y-2"></div>
                         <div id="noEvents" class="text-gray-500 text-sm italic hidden">No events this month</div>
                     </div>
                 </div>
@@ -111,13 +223,19 @@ $events = [
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                     </div>
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">From</label>
-                        <input type="date" id="eventStart" required
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                        <select id="eventDepartment" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <option value="">Select Department</option>
+                            <?php foreach ($departments as $dept): ?>
+                                <option value="<?php echo $dept['department_id']; ?>">
+                                    <?php echo htmlspecialchars($dept['department_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
-                    <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">To</label>
-                        <input type="date" id="eventEnd" required
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                        <input type="date" id="eventStart" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                     </div>
                     <div class="flex gap-3">
@@ -146,13 +264,19 @@ $events = [
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                     </div>
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">From</label>
-                        <input type="date" id="editEventStart" required
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                        <select id="editEventDepartment" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <option value="">Select Department</option>
+                            <?php foreach ($departments as $dept): ?>
+                                <option value="<?php echo $dept['department_id']; ?>">
+                                    <?php echo htmlspecialchars($dept['department_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                     <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">To</label>
-                        <input type="date" id="editEventEnd" required
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                        <input type="date" id="editEventStart" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                     </div>
                     <div class="flex gap-3">
@@ -190,13 +314,12 @@ $events = [
     <script>
         let events = <?php echo json_encode($events); ?>;
         let currentView = 'yearly';
-        let currentYear = 2025;
-        let currentMonth = 0;
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth();
 
         const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
             'July', 'August', 'September', 'October', 'November', 'December'
         ];
-
 
         document.addEventListener('DOMContentLoaded', function() {
             renderYearlyView();
@@ -258,11 +381,9 @@ $events = [
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             let html = '';
 
-
             for (let i = 0; i < firstDay; i++) {
                 html += '<div></div>';
             }
-
 
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -281,11 +402,9 @@ $events = [
             const firstDay = new Date(currentYear, currentMonth, 1).getDay();
             const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
 
-
             for (let i = 0; i < firstDay; i++) {
                 container.innerHTML += '<div></div>';
             }
-
 
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -324,7 +443,8 @@ $events = [
                 container.innerHTML = monthEvents.map(e => `
                     <div class="bg-teal-800 text-white rounded-lg p-4 hover:bg-teal-700 transition-colors cursor-pointer" onclick="openEditEventModal(${e.id})">
                         <h4 class="font-semibold text-lg mb-1">${e.name}</h4>
-                        <p class="text-sm opacity-90">${formatDate(e.start)} ${e.start !== e.end ? '- ' + formatDate(e.end) : ''}</p>
+                        <p class="text-sm opacity-90">${formatDate(e.start)}</p>
+                        ${e.department ? `<p class="text-xs opacity-75 mt-1">${e.department}</p>` : ''}
                     </div>
                 `).join('');
             }
@@ -364,34 +484,43 @@ $events = [
             }
         }
 
-        //Modal1
         function openAddEventModal() {
             document.getElementById('addEventModal').classList.remove('hidden');
             document.getElementById('eventName').value = '';
+            document.getElementById('eventDepartment').value = '';
             document.getElementById('eventStart').value = '';
-            document.getElementById('eventEnd').value = '';
         }
 
         function closeAddEventModal() {
             document.getElementById('addEventModal').classList.add('hidden');
         }
 
-        function submitEvent(e) {
+        async function submitEvent(e) {
             e.preventDefault();
-            const newEvent = {
-                id: events.length + 1,
-                name: document.getElementById('eventName').value,
-                start: document.getElementById('eventStart').value,
-                end: document.getElementById('eventEnd').value,
-                color: '#0d9488'
-            };
-            events.push(newEvent);
-            closeAddEventModal();
-            showSuccess('Event has been added successfully.');
-            if (currentView === 'yearly') {
-                renderYearlyView();
-            } else {
-                renderMonthlyView();
+            
+            const formData = new FormData();
+            formData.append('action', 'add_event');
+            formData.append('event_name', document.getElementById('eventName').value);
+            formData.append('department_id', document.getElementById('eventDepartment').value);
+            formData.append('event_start', document.getElementById('eventStart').value);
+            
+            try {
+                const response = await fetch('calendar.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    closeAddEventModal();
+                    showSuccess('Event has been added successfully.');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error adding event: ' + error.message);
             }
         }
 
@@ -401,7 +530,6 @@ $events = [
                 document.getElementById('editEventId').value = event.id;
                 document.getElementById('editEventName').value = event.name;
                 document.getElementById('editEventStart').value = event.start;
-                document.getElementById('editEventEnd').value = event.end;
                 document.getElementById('editEventModal').classList.remove('hidden');
             }
         }
@@ -410,35 +538,60 @@ $events = [
             document.getElementById('editEventModal').classList.add('hidden');
         }
 
-        function updateEvent(e) {
+        async function updateEvent(e) {
             e.preventDefault();
-            const eventId = parseInt(document.getElementById('editEventId').value);
-            const eventIndex = events.findIndex(e => e.id === eventId);
-            if (eventIndex !== -1) {
-                events[eventIndex].name = document.getElementById('editEventName').value;
-                events[eventIndex].start = document.getElementById('editEventStart').value;
-                events[eventIndex].end = document.getElementById('editEventEnd').value;
-                closeEditEventModal();
-                showSuccess('Event has been updated successfully.');
-                if (currentView === 'yearly') {
-                    renderYearlyView();
+            
+            const formData = new FormData();
+            formData.append('action', 'update_event');
+            formData.append('event_id', document.getElementById('editEventId').value);
+            formData.append('event_name', document.getElementById('editEventName').value);
+            formData.append('department_id', document.getElementById('editEventDepartment').value);
+            formData.append('event_start', document.getElementById('editEventStart').value);
+            
+            try {
+                const response = await fetch('calendar.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    closeEditEventModal();
+                    showSuccess('Event has been updated successfully.');
+                    setTimeout(() => location.reload(), 1500);
                 } else {
-                    renderMonthlyView();
+                    alert('Error: ' + result.message);
                 }
+            } catch (error) {
+                alert('Error updating event: ' + error.message);
             }
         }
 
-        function deleteEvent() {
-            if (confirm('Are you sure you want to delete this event?')) {
-                const eventId = parseInt(document.getElementById('editEventId').value);
-                events = events.filter(e => e.id !== eventId);
-                closeEditEventModal();
-                showSuccess('Event has been deleted successfully.');
-                if (currentView === 'yearly') {
-                    renderYearlyView();
+        async function deleteEvent() {
+            if (!confirm('Are you sure you want to delete this event?')) return;
+            
+            const formData = new FormData();
+            formData.append('action', 'delete_event');
+            formData.append('event_id', document.getElementById('editEventId').value);
+            
+            try {
+                const response = await fetch('calendar.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    closeEditEventModal();
+                    showSuccess('Event has been deleted successfully.');
+                    setTimeout(() => location.reload(), 1500);
                 } else {
-                    renderMonthlyView();
+                    alert('Error: ' + result.message);
                 }
+            } catch (error) {
+                alert('Error deleting event: ' + error.message);
             }
         }
 
@@ -452,5 +605,4 @@ $events = [
         }
     </script>
 </body>
-
 </html>

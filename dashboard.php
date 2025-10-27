@@ -1,19 +1,70 @@
 <?php
 session_start();
-//token sa user to pre kailangan lag na sure na logged in yung admin
-//bat ko ba ineexplain alam mo naman na to e pota
-if (!isset($_SESSION['user_id'])) {
+
+// Check if user is logged in - PROPER CHECK
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header('Location: index.php');
     exit;
 }
 
-// include mo rito pag meron na 'config/database.php';
-// fetch actual data from database
+require_once 'config/database.php';
 
+// Log page access
+if (isset($logger)) {
+    $logger->debug('PAGE', 'Dashboard accessed', 'User: ' . ($_SESSION['username'] ?? 'unknown'));
+}
+
+// Get total employees
+$totalEmployees = 0;
+$sql = "SELECT COUNT(*) as total FROM employee WHERE employment_status = 'Active'";
+$result = fetchOne($conn, $sql);
+if ($result && !isset($result['error'])) {
+    $totalEmployees = $result['total'];
+}
+
+// Get total applicants
+$totalApplicants = 0;
+$sql = "SELECT COUNT(*) as total FROM applicant WHERE application_status = 'Pending'";
+$result = fetchOne($conn, $sql);
+if ($result && !isset($result['error'])) {
+    $totalApplicants = $result['total'];
+}
+
+// Get upcoming events this month
+$upcomingEvents = 0;
+$sql = "SELECT COUNT(*) as total FROM recruitment 
+        WHERE MONTH(date_posted) = MONTH(CURDATE()) 
+        AND YEAR(date_posted) = YEAR(CURDATE())";
+$result = fetchOne($conn, $sql);
+if ($result && !isset($result['error'])) {
+    $upcomingEvents = $result['total'];
+}
+
+// Get monthly employee data for chart
+$monthlyData = [];
+$sql = "SELECT DATE_FORMAT(hire_date, '%b') as month, COUNT(*) as count 
+        FROM employee 
+        WHERE YEAR(hire_date) = YEAR(CURDATE())
+        GROUP BY MONTH(hire_date)
+        ORDER BY MONTH(hire_date)";
+$chartData = fetchAll($conn, $sql);
+if ($chartData && !isset($chartData['error'])) {
+    $monthlyData = $chartData;
+}
+
+// Prepare data for JavaScript
+$months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+$employeeCounts = array_fill(0, 12, 0);
+
+foreach ($monthlyData as $data) {
+    $monthIndex = array_search($data['month'], $months);
+    if ($monthIndex !== false) {
+        $employeeCounts[$monthIndex] = (int)$data['count'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -21,44 +72,39 @@ if (!isset($_SESSION['user_id'])) {
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="css/styles.css">
-
 </head>
-
 <body class="bg-gray-100">
-
-     <div class="min-h-screen lg:ml-64">
+    <div class="min-h-screen lg:ml-64">
         <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Dashboard</h1>
-                <a href="index.php" class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
+                <a href="logout.php" 
+                   onclick="return confirm('Are you sure you want to logout?')"
+                   class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
                     Logout
                 </a>
             </div>
         </header>
 
-        <!-- Main Content -->
         <main class="p-4 lg:p-8">
             <!-- Stats Cards -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
-                <!-- Employees Card -->
                 <div class="bg-teal-700 text-white rounded-lg p-4 lg:p-6 shadow-lg">
                     <h3 class="text-base lg:text-lg font-semibold mb-2">Employees</h3>
-                    <p class="text-2xl lg:text-3xl font-bold">69</p>
+                    <p class="text-2xl lg:text-3xl font-bold"><?php echo $totalEmployees; ?></p>
                     <p class="text-xs lg:text-sm opacity-80 mt-2">Total Active Employees</p>
                 </div>
 
-                <!-- Applicants Card -->
                 <div class="bg-teal-700 text-white rounded-lg p-4 lg:p-6 shadow-lg">
                     <h3 class="text-base lg:text-lg font-semibold mb-2">Applicants</h3>
-                    <p class="text-2xl lg:text-3xl font-bold">69</p>
+                    <p class="text-2xl lg:text-3xl font-bold"><?php echo $totalApplicants; ?></p>
                     <p class="text-xs lg:text-sm opacity-80 mt-2">Pending Applications</p>
                 </div>
 
-                <!-- Events Card -->
                 <div class="bg-teal-700 text-white rounded-lg p-4 lg:p-6 shadow-lg sm:col-span-2 lg:col-span-1">
                     <h3 class="text-base lg:text-lg font-semibold mb-2">Events</h3>
-                    <p class="text-2xl lg:text-3xl font-bold">69</p>
+                    <p class="text-2xl lg:text-3xl font-bold"><?php echo $upcomingEvents; ?></p>
                     <p class="text-xs lg:text-sm opacity-80 mt-2">Upcoming This Month</p>
                 </div>
             </div>
@@ -80,10 +126,10 @@ if (!isset($_SESSION['user_id'])) {
         const employeeChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
+                labels: <?php echo json_encode($months); ?>,
                 datasets: [{
                     label: 'Number of Employees',
-                    data: [58, 54, 49, 43, 45, 50, 52, 57, 60, 62],
+                    data: <?php echo json_encode($employeeCounts); ?>,
                     backgroundColor: '#bbf7d0',
                     borderColor: '#10b981',
                     borderWidth: 1
@@ -95,7 +141,6 @@ if (!isset($_SESSION['user_id'])) {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        max: 70,
                         ticks: {
                             stepSize: 10
                         }
@@ -110,5 +155,4 @@ if (!isset($_SESSION['user_id'])) {
         });
     </script>
 </body>
-
 </html>
