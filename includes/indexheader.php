@@ -1,5 +1,4 @@
 <head>
-  <title>ELECT</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/header.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:wght@600&display=swap" />

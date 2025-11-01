@@ -1,10 +1,5 @@
 <?php
-/**
- * Login & Time-In/Out Page - FINAL VERSION
- * File: index.php
- */
 
-// Session configuration BEFORE session_start()
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);
 ini_set('session.cookie_secure', 0);
@@ -229,9 +224,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </button>
         </form>
         
-        <p class="text-center text-gray-600 text-sm mt-6">
-            Forgot password? <a href="#" class="text-teal-600 hover:underline">Contact Admin</a>
-        </p>
 
         <button 
             onclick="toggleForms()"

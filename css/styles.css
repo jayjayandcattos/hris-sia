@@ -30,6 +30,18 @@ body {
   overflow: hidden;
 }
 
+/* Fix for clickable form elements */
+.bg-white.rounded-lg {
+  position: relative;
+  z-index: 20;
+}
+
+.bg-white.rounded-lg input,
+.bg-white.rounded-lg button {
+  position: relative;
+  z-index: 21;
+}
+
 .gradient-bg::before {
   content: '';
   position: absolute;
@@ -131,14 +143,24 @@ body {
 }
 
 
-input[type="text"] {
+input[type="text"],
+input[type="password"] {
   transition: all 0.3s ease;
   border: 2px solid transparent;
 }
 
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="password"]:focus {
   border-color: var(--primary-light);
   box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+button {
+  transition: all 0.3s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
 }
 
 
