@@ -81,7 +81,7 @@ foreach ($monthlyData as $data) {
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Dashboard</h1>
                 <a href="logout.php" 
                    onclick="return confirm('Are you sure you want to logout?')"
-                   classb="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
+                   class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
                     Logout
                 </a>
             </div>
