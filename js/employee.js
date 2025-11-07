@@ -27,7 +27,7 @@
                 card.style.display = (matchesSearch && matchesDept) ? '' : 'none';
             });
         }
-// Placeholder functions for Add, Edit, and Archive actions
+
         function addEmployee() {
             alert('backend pa');
         }
