@@ -10,7 +10,6 @@ require_once 'config/database.php';
 $message = '';
 $messageType = '';
 
-// Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
@@ -130,11 +129,35 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $messageType = "error";
                 }
                 break;
+
+            case 'unarchive':
+                try {
+                    $sql = "UPDATE employee SET employment_status = 'Active' WHERE employee_id = ?";
+                    $stmt = $conn->prepare($sql);
+                    $success = $stmt->execute([$_POST['employee_id']]);
+
+                    if ($success) {
+                        if (isset($logger)) {
+                            $logger->info('EMPLOYEE', 'Employee restored', "Employee ID: {$_POST['employee_id']}");
+                        }
+                        $message = "Employee restored successfully!";
+                        $messageType = "success";
+                    } else {
+                        throw new Exception("Failed to restore employee");
+                    }
+                } catch (Exception $e) {
+                    if (isset($logger)) {
+                        $logger->error('EMPLOYEE', 'Failed to restore employee', $e->getMessage());
+                    }
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = "error";
+                }
+                break;
         }
     }
 }
 
-// Fetch employees with filters
+$view = $_GET['view'] ?? 'active';
 $search = $_GET['search'] ?? '';
 $position_filter = $_GET['position'] ?? '';
 $department_filter = $_GET['department'] ?? '';
@@ -145,9 +168,9 @@ $sql = "SELECT e.*,
         FROM employee e
         LEFT JOIN department d ON e.department_id = d.department_id
         LEFT JOIN position p ON e.position_id = p.position_id
-        WHERE e.employment_status = 'Active'";
+        WHERE e.employment_status = ?";
 
-$params = [];
+$params = [$view === 'archived' ? 'Inactive' : 'Active'];
 
 if ($search) {
     $sql .= " AND (e.first_name LIKE ? OR e.last_name LIKE ? OR e.email LIKE ?)";
@@ -171,10 +194,7 @@ $sql .= " ORDER BY e.employee_id DESC";
 
 $employees = fetchAll($conn, $sql, $params);
 
-// Fetch departments for dropdown
 $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_name");
-
-// Fetch positions for dropdown
 $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
 ?>
 <!DOCTYPE html>
@@ -206,6 +226,57 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                 display: table;
             }
         }
+
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            background-color: #0d9488;
+            color: white;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeInModal 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 0;
+            border-radius: 0.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes fadeInModal {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 
@@ -215,9 +286,9 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Employee Management</h1>
-                <a href="logout.php" class="bg-white text-teal-600 px-3 py-2 rounded-lg font-medium hover:bg-gray-100 text-xs sm:text-sm">
+                <button onclick="openLogoutModal()" class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
                     Logout
-                </a>
+                </button>
             </div>
         </header>
 
@@ -228,20 +299,26 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                 </div>
             <?php endif; ?>
 
-            <!-- Search and Filter -->
             <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6 mb-4 lg:mb-6">
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <a href="?view=active" class="tab-button px-4 py-2 rounded-lg font-medium text-sm <?php echo $view === 'active' ? 'active' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'; ?>">
+                        Active Employees
+                    </a>
+                    <a href="?view=archived" class="tab-button px-4 py-2 rounded-lg font-medium text-sm <?php echo $view === 'archived' ? 'active' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'; ?>">
+                        Archived Employees
+                    </a>
+                </div>
+
                 <form method="GET" id="filterForm" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                    <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>"
+                    <input type="hidden" name="view" value="<?php echo $view; ?>">
+                    <input type="text" name="search" id="searchInput" value="<?php echo htmlspecialchars($search); ?>"
                         placeholder="Search Name or Email"
-                        onkeyup="debounceSearch(this)"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
                     <input type="text" name="position" value="<?php echo htmlspecialchars($position_filter); ?>"
                         placeholder="Filter by Position"
-                        onchange="this.form.submit()"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
                     <input type="text" name="department" value="<?php echo htmlspecialchars($department_filter); ?>"
                         placeholder="Filter by Department"
-                        onchange="this.form.submit()"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
                     <div class="flex gap-2">
                         <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium text-sm">
@@ -250,13 +327,14 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                         <button type="button" onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium text-sm">
                             Clear
                         </button>
+                        <?php if ($view === 'active'): ?>
                         <button type="button" onclick="openAddModal()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
                             + Add Employee
                         </button>
+                        <?php endif; ?>
                     </div>
                 </form>
 
-                <!-- Desktop Table -->
                 <div class="overflow-x-auto">
                     <table class="desktop-table w-full">
                         <thead>
@@ -271,74 +349,94 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($employees as $emp): ?>
-                                <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                    <td class="px-3 py-2 text-sm"><?php echo $emp['employee_id']; ?></td>
-                                    <td class="px-3 py-2 text-sm"><?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?></td>
-                                    <td class="px-3 py-2 text-sm"><?php echo htmlspecialchars($emp['position_title'] ?? 'N/A'); ?></td>
-                                    <td class="px-3 py-2 text-sm"><?php echo htmlspecialchars($emp['department_name'] ?? 'N/A'); ?></td>
-                                    <td class="px-3 py-2 text-sm"><?php echo htmlspecialchars($emp['contact_number'] ?? 'N/A'); ?></td>
-                                    <td class="px-3 py-2 text-sm"><?php echo htmlspecialchars($emp['email'] ?? 'N/A'); ?></td>
-                                    <td class="px-3 py-2">
-                                        <div class="flex gap-2">
-                                            <button onclick='editEmployee(<?php echo json_encode($emp); ?>)'
-                                                class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
-                                                Edit
-                                            </button>
-                                            <form method="POST" style="display: inline;" onsubmit="return confirm('Archive this employee?')">
-                                                <input type="hidden" name="action" value="archive">
-                                                <input type="hidden" name="employee_id" value="<?php echo $emp['employee_id']; ?>">
-                                                <button type="submit" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs">
-                                                    Archive
-                                                </button>
-                                            </form>
-                                        </div>
+                            <?php if (empty($employees)): ?>
+                                <tr>
+                                    <td colspan="7" class="px-3 py-8 text-center text-gray-500">
+                                        No <?php echo $view === 'archived' ? 'archived' : 'active'; ?> employees found
                                     </td>
                                 </tr>
-                            <?php endforeach; ?>
+                            <?php else: ?>
+                                <?php foreach ($employees as $emp): ?>
+                                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                        <td class="px-3 py-2 text-sm"><?php echo $emp['employee_id']; ?></td>
+                                        <td class="px-3 py-2 text-sm"><?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?></td>
+                                        <td class="px-3 py-2 text-sm"><?php echo htmlspecialchars($emp['position_title'] ?? 'N/A'); ?></td>
+                                        <td class="px-3 py-2 text-sm"><?php echo htmlspecialchars($emp['department_name'] ?? 'N/A'); ?></td>
+                                        <td class="px-3 py-2 text-sm"><?php echo htmlspecialchars($emp['contact_number'] ?? 'N/A'); ?></td>
+                                        <td class="px-3 py-2 text-sm"><?php echo htmlspecialchars($emp['email'] ?? 'N/A'); ?></td>
+                                        <td class="px-3 py-2">
+                                            <div class="flex gap-2">
+                                                <?php if ($view === 'active'): ?>
+                                                    <button onclick='editEmployee(<?php echo json_encode($emp); ?>)'
+                                                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                                                        Edit
+                                                    </button>
+                                                    <button onclick="openArchiveModal(<?php echo $emp['employee_id']; ?>, '<?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?>')"
+                                                        class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs">
+                                                        Archive
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button onclick="openUnarchiveModal(<?php echo $emp['employee_id']; ?>, '<?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?>')"
+                                                        class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">
+                                                        Restore
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Mobile Cards -->
                 <div class="mobile-card space-y-3">
-                    <?php foreach ($employees as $emp): ?>
-                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <h3 class="font-semibold text-gray-900"><?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?></h3>
-                                    <p class="text-xs text-gray-500">ID: <?php echo $emp['employee_id']; ?></p>
+                    <?php if (empty($employees)): ?>
+                        <div class="text-center text-gray-500 py-8">
+                            No <?php echo $view === 'archived' ? 'archived' : 'active'; ?> employees found
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($employees as $emp): ?>
+                            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900"><?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?></h3>
+                                        <p class="text-xs text-gray-500">ID: <?php echo $emp['employee_id']; ?></p>
+                                    </div>
+                                </div>
+                                <div class="space-y-2 mb-3 text-sm">
+                                    <div><span class="text-gray-500">Position:</span> <?php echo htmlspecialchars($emp['position_title'] ?? 'N/A'); ?></div>
+                                    <div><span class="text-gray-500">Department:</span> <?php echo htmlspecialchars($emp['department_name'] ?? 'N/A'); ?></div>
+                                    <div><span class="text-gray-500">Contact:</span> <?php echo htmlspecialchars($emp['contact_number'] ?? 'N/A'); ?></div>
+                                    <div><span class="text-gray-500">Email:</span> <?php echo htmlspecialchars($emp['email'] ?? 'N/A'); ?></div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <?php if ($view === 'active'): ?>
+                                        <button onclick='editEmployee(<?php echo json_encode($emp); ?>)'
+                                            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
+                                            Edit
+                                        </button>
+                                        <button onclick="openArchiveModal(<?php echo $emp['employee_id']; ?>, '<?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?>')"
+                                            class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm">
+                                            Archive
+                                        </button>
+                                    <?php else: ?>
+                                        <button onclick="openUnarchiveModal(<?php echo $emp['employee_id']; ?>, '<?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?>')"
+                                            class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm">
+                                            Restore
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
-                            <div class="space-y-2 mb-3 text-sm">
-                                <div><span class="text-gray-500">Position:</span> <?php echo htmlspecialchars($emp['position_title'] ?? 'N/A'); ?></div>
-                                <div><span class="text-gray-500">Department:</span> <?php echo htmlspecialchars($emp['department_name'] ?? 'N/A'); ?></div>
-                                <div><span class="text-gray-500">Contact:</span> <?php echo htmlspecialchars($emp['contact_number'] ?? 'N/A'); ?></div>
-                                <div><span class="text-gray-500">Email:</span> <?php echo htmlspecialchars($emp['email'] ?? 'N/A'); ?></div>
-                            </div>
-                            <div class="flex gap-2">
-                                <button onclick='editEmployee(<?php echo json_encode($emp); ?>)'
-                                    class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
-                                    Edit
-                                </button>
-                                <form method="POST" class="flex-1" onsubmit="return confirm('Archive?')">
-                                    <input type="hidden" name="action" value="archive">
-                                    <input type="hidden" name="employee_id" value="<?php echo $emp['employee_id']; ?>">
-                                    <button type="submit" class="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm">
-                                        Archive
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Add/Edit Modal -->
     <div id="employeeModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div class="p-6">
                 <h3 id="modalTitle" class="text-xl font-bold text-gray-800 mb-4">Add Employee</h3>
                 <form id="employeeForm" method="POST">
@@ -431,20 +529,89 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
         </div>
     </div>
 
+    <div id="archiveModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Confirm Archive</h3>
+                <p class="text-gray-600 mb-6">Are you sure you want to archive <span id="archiveEmployeeName" class="font-semibold"></span>?</p>
+                <form method="POST" id="archiveForm">
+                    <input type="hidden" name="action" value="archive">
+                    <input type="hidden" name="employee_id" id="archiveEmployeeId">
+                    <div class="flex gap-3">
+                        <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-medium">
+                            Yes, Archive
+                        </button>
+                        <button type="button" onclick="closeArchiveModal()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="unarchiveModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Confirm Restore</h3>
+                <p class="text-gray-600 mb-6">Are you sure you want to restore <span id="unarchiveEmployeeName" class="font-semibold"></span>?</p>
+                <form method="POST" id="unarchiveForm">
+                    <input type="hidden" name="action" value="unarchive">
+                    <input type="hidden" name="employee_id" id="unarchiveEmployeeId">
+                    <div class="flex gap-3">
+                        <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium">
+                            Yes, Restore
+                        </button>
+                        <button type="button" onclick="closeUnarchiveModal()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logout Modal -->
+    <div id="logoutModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="bg-red-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Confirm Logout</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6">Are you sure you want to logout?</p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="closeLogoutModal()" 
+                            class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                        Cancel
+                    </button>
+                    <a href="logout.php" 
+                       class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let searchTimeout;
 
-        function debounceSearch(input) {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                if (input.value.length >= 3 || input.value.length === 0) {
-                    input.form.submit();
-                }
-            }, 500); // Wait 500ms after user stops typing
-        }
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            
+            searchInput.addEventListener('input', function(e) {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    const value = this.value;
+                    if (value.length >= 3 || value.length === 0) {
+                        document.getElementById('filterForm').submit();
+                    }
+                }, 500);
+            });
+        });
 
         function clearFilters() {
-            window.location.href = 'employees.php';
+            window.location.href = 'employees.php?view=<?php echo $view; ?>';
         }
 
         function openAddModal() {
@@ -475,6 +642,67 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
         function closeModal() {
             document.getElementById('employeeModal').classList.add('hidden');
         }
+
+        function openArchiveModal(employeeId, employeeName) {
+            document.getElementById('archiveEmployeeId').value = employeeId;
+            document.getElementById('archiveEmployeeName').textContent = employeeName;
+            document.getElementById('archiveModal').classList.remove('hidden');
+        }
+
+        function closeArchiveModal() {
+            document.getElementById('archiveModal').classList.add('hidden');
+        }
+
+        function openUnarchiveModal(employeeId, employeeName) {
+            document.getElementById('unarchiveEmployeeId').value = employeeId;
+            document.getElementById('unarchiveEmployeeName').textContent = employeeName;
+            document.getElementById('unarchiveModal').classList.remove('hidden');
+        }
+
+        function closeUnarchiveModal() {
+            document.getElementById('unarchiveModal').classList.add('hidden');
+        }
+
+        function openLogoutModal() {
+            document.getElementById('logoutModal').classList.add('active');
+        }
+
+        function closeLogoutModal() {
+            document.getElementById('logoutModal').classList.remove('active');
+        }
+
+
+        document.getElementById('logoutModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLogoutModal();
+            }
+        });
+
+  
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const logoutModal = document.getElementById('logoutModal');
+                if (logoutModal.classList.contains('active')) {
+                    closeLogoutModal();
+                }
+            }
+        });
+
+        document.addEventListener('click', function(event) {
+            const employeeModal = document.getElementById('employeeModal');
+            const archiveModal = document.getElementById('archiveModal');
+            const unarchiveModal = document.getElementById('unarchiveModal');
+            
+            if (event.target === employeeModal) {
+                closeModal();
+            }
+            if (event.target === archiveModal) {
+                closeArchiveModal();
+            }
+            if (event.target === unarchiveModal) {
+                closeUnarchiveModal();
+            }
+        });
     </script>
 </body>
 

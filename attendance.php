@@ -10,24 +10,25 @@ require_once 'config/database.php';
 $message = '';
 $messageType = '';
 
-// Handle manual attendance actions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'time_out':
                 try {
                     $sql = "UPDATE attendance 
-                            SET time_out = NOW(), 
-                                total_hours = ROUND(TIMESTAMPDIFF(MINUTE, time_in, NOW()) / 60, 2)
+                            SET time_out = NOW()
                             WHERE attendance_id = ?";
-                    
+
                     $stmt = $conn->prepare($sql);
                     $success = $stmt->execute([$_POST['attendance_id']]);
-                    
+
                     if ($success) {
                         if (isset($logger)) {
-                            $logger->info('ATTENDANCE', 'Time-out recorded', 
-                                "Attendance ID: {$_POST['attendance_id']}");
+                            $logger->info(
+                                'ATTENDANCE',
+                                'Time-out recorded',
+                                "Attendance ID: {$_POST['attendance_id']}"
+                            );
                         }
                         $message = "Time-out recorded successfully!";
                         $messageType = "success";
@@ -46,7 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Fetch attendance records
 $date_filter = $_GET['date'] ?? date('Y-m-d');
 $position_filter = $_GET['position'] ?? '';
 $department_filter = $_GET['department'] ?? '';
@@ -54,9 +54,7 @@ $department_filter = $_GET['department'] ?? '';
 $sql = "SELECT a.*, 
         e.first_name, e.last_name, e.employee_id as emp_id,
         d.department_name, 
-        p.position_title,
-        DATE_FORMAT(a.time_in, '%h:%i %p') as formatted_time_in,
-        DATE_FORMAT(a.time_out, '%h:%i %p') as formatted_time_out
+        p.position_title
         FROM attendance a
         INNER JOIN employee e ON a.employee_id = e.employee_id
         LEFT JOIN department d ON e.department_id = d.department_id
@@ -87,7 +85,28 @@ try {
     $messageType = "error";
 }
 
-// Count statistics
+function calculateWorkHours($time_in, $time_out)
+{
+    if (!$time_in) return '-';
+
+    $start = new DateTime($time_in);
+    $end = $time_out ? new DateTime($time_out) : new DateTime();
+
+    $interval = $start->diff($end);
+
+    $hours = $interval->h + ($interval->days * 24);
+    $minutes = $interval->i;
+
+    if ($hours == 0 && $minutes == 0) {
+        $seconds = $interval->s;
+        return $seconds . 's';
+    } elseif ($hours == 0) {
+        return $minutes . 'm';
+    } else {
+        return $hours . 'h ' . $minutes . 'm';
+    }
+}
+
 $present = 0;
 $absent = 0;
 $leave = 0;
@@ -98,7 +117,6 @@ foreach ($attendance_records as $record) {
     elseif ($record['status'] === 'Leave') $leave++;
 }
 
-// Get total active employees
 $totalEmployees = 0;
 try {
     $empSql = "SELECT COUNT(*) as total FROM employee WHERE employment_status = 'Active'";
@@ -109,7 +127,6 @@ try {
     $totalEmployees = 0;
 }
 
-// Calculate absent (employees who didn't time in today)
 if ($date_filter == date('Y-m-d')) {
     $absent = $totalEmployees - count($attendance_records);
 }
@@ -123,6 +140,56 @@ if ($date_filter == date('Y-m-d')) {
     <title>HRIS - Attendance</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
+
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeInModal 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 0;
+            border-radius: 0.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes fadeInModal {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 
 <body class="bg-gray-100">
@@ -132,9 +199,10 @@ if ($date_filter == date('Y-m-d')) {
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Attendance</h1>
-                <a href="logout.php" class="bg-white text-teal-600 px-3 py-2 rounded-lg font-medium hover:bg-gray-100 text-xs sm:text-sm transition-colors">
+                <button onclick="openLogoutModal()"
+                    class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
                     Logout
-                </a>
+                </button>
             </div>
         </header>
 
@@ -173,11 +241,11 @@ if ($date_filter == date('Y-m-d')) {
                     <input type="date" name="date" value="<?php echo htmlspecialchars($date_filter); ?>"
                         onchange="this.form.submit()"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
-                    <input type="text" name="position" value="<?php echo htmlspecialchars($position_filter); ?>" 
+                    <input type="text" name="position" value="<?php echo htmlspecialchars($position_filter); ?>"
                         placeholder="Position"
                         onchange="this.form.submit()"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
-                    <input type="text" name="department" value="<?php echo htmlspecialchars($department_filter); ?>" 
+                    <input type="text" name="department" value="<?php echo htmlspecialchars($department_filter); ?>"
                         placeholder="Department"
                         onchange="this.form.submit()"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
@@ -198,109 +266,117 @@ if ($date_filter == date('Y-m-d')) {
                 </form>
 
                 <?php if (!empty($attendance_records)): ?>
-                <!-- Desktop Table -->
-                <div class="overflow-x-auto">
-                    <table class="desktop-table w-full">
-                        <thead>
-                            <tr class="bg-gray-50 border-b border-gray-200">
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Employee ID</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Employee Name</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Position</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Department</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Time-In</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Time-Out</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Total Hours</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="attendanceTableBody">
-                            <?php foreach ($attendance_records as $record): ?>
-                                <tr class="border-b border-gray-200 hover:bg-gray-50 transition-colors" data-status="<?php echo htmlspecialchars($record['status']); ?>">
-                                    <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['emp_id']); ?></td>
-                                    <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['first_name'] . ' ' . $record['last_name']); ?></td>
-                                    <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['position_title'] ?? 'N/A'); ?></td>
-                                    <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['department_name'] ?? 'N/A'); ?></td>
-                                    <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['formatted_time_in'] ?? '-'); ?></td>
-                                    <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['formatted_time_out'] ?? '-'); ?></td>
-                                    <td class="px-3 py-2 text-sm text-gray-800"><?php echo $record['total_hours'] ? number_format($record['total_hours'], 2) . 'h' : '-'; ?></td>
-                                    <td class="px-3 py-2">
-                                        <?php if (!$record['time_out']): ?>
-                                            <form method="POST" style="display: inline;" onsubmit="return confirm('Record time-out for this employee?');">
-                                                <input type="hidden" name="action" value="time_out">
-                                                <input type="hidden" name="attendance_id" value="<?php echo htmlspecialchars($record['attendance_id']); ?>">
-                                                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                    Time Out
-                                                </button>
-                                            </form>
-                                        <?php else: ?>
-                                            <span class="text-green-600 text-xs font-medium">✓ Complete</span>
-                                        <?php endif; ?>
-                                    </td>
+                    <div class="overflow-x-auto">
+                        <table class="desktop-table w-full">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-gray-200">
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Employee ID</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Employee Name</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Position</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Department</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Time-In</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Time-Out</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Work Duration</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody id="attendanceTableBody">
+                                <?php foreach ($attendance_records as $record): ?>
+                                    <tr class="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+                                        data-status="<?php echo htmlspecialchars($record['status']); ?>"
+                                        data-time-in="<?php echo htmlspecialchars($record['time_in']); ?>"
+                                        data-time-out="<?php echo htmlspecialchars($record['time_out'] ?? ''); ?>"
+                                        data-attendance-id="<?php echo htmlspecialchars($record['attendance_id']); ?>">
+                                        <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['emp_id']); ?></td>
+                                        <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['first_name'] . ' ' . $record['last_name']); ?></td>
+                                        <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['position_title'] ?? 'N/A'); ?></td>
+                                        <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['department_name'] ?? 'N/A'); ?></td>
+                                        <td class="px-3 py-2 text-sm text-gray-800"><?php echo date('h:i A', strtotime($record['time_in'])); ?></td>
+                                        <td class="px-3 py-2 text-sm text-gray-800"><?php echo $record['time_out'] ? date('h:i A', strtotime($record['time_out'])) : '-'; ?></td>
+                                        <td class="px-3 py-2 text-sm text-gray-800 work-duration" data-live="<?php echo !$record['time_out'] ? '1' : '0'; ?>">
+                                            <?php echo calculateWorkHours($record['time_in'], $record['time_out']); ?>
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <?php if (!$record['time_out']): ?>
+                                                <form method="POST" style="display: inline;" onsubmit="return confirm('Record time-out for this employee?');">
+                                                    <input type="hidden" name="action" value="time_out">
+                                                    <input type="hidden" name="attendance_id" value="<?php echo htmlspecialchars($record['attendance_id']); ?>">
+                                                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                        Time Out
+                                                    </button>
+                                                </form>
+                                            <?php else: ?>
+                                                <span class="text-green-600 text-xs font-medium">✓ Complete</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
 
-                <!-- Mobile Cards -->
-                <div class="mobile-card space-y-3" id="mobileCardContainer">
-                    <?php foreach ($attendance_records as $record): ?>
-                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow attendance-card"
-                            data-position="<?php echo strtolower($record['position_title'] ?? ''); ?>"
-                            data-department="<?php echo strtolower($record['department_name'] ?? ''); ?>"
-                            data-status="<?php echo htmlspecialchars($record['status']); ?>">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <h3 class="font-semibold text-gray-900 text-base"><?php echo htmlspecialchars($record['first_name'] . ' ' . $record['last_name']); ?></h3>
-                                    <p class="text-xs text-gray-500 mt-1"><?php echo htmlspecialchars($record['emp_id']); ?></p>
-                                </div>
-                                <span class="px-2 py-1 text-xs font-medium rounded-full 
+                    <div class="mobile-card space-y-3" id="mobileCardContainer">
+                        <?php foreach ($attendance_records as $record): ?>
+                            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow attendance-card"
+                                data-position="<?php echo strtolower($record['position_title'] ?? ''); ?>"
+                                data-department="<?php echo strtolower($record['department_name'] ?? ''); ?>"
+                                data-status="<?php echo htmlspecialchars($record['status']); ?>"
+                                data-time-in="<?php echo htmlspecialchars($record['time_in']); ?>"
+                                data-time-out="<?php echo htmlspecialchars($record['time_out'] ?? ''); ?>">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900 text-base"><?php echo htmlspecialchars($record['first_name'] . ' ' . $record['last_name']); ?></h3>
+                                        <p class="text-xs text-gray-500 mt-1"><?php echo htmlspecialchars($record['emp_id']); ?></p>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs font-medium rounded-full 
                                     <?php
                                     if ($record['status'] === 'Present') echo 'bg-green-100 text-green-800';
                                     elseif ($record['status'] === 'Absent') echo 'bg-red-100 text-red-800';
                                     else echo 'bg-yellow-100 text-yellow-800';
                                     ?>">
-                                    <?php echo htmlspecialchars($record['status']); ?>
-                                </span>
-                            </div>
+                                        <?php echo htmlspecialchars($record['status']); ?>
+                                    </span>
+                                </div>
 
-                            <div class="space-y-2 mb-3">
-                                <div class="flex items-center text-sm">
-                                    <span class="text-gray-500 w-24 text-xs">Position:</span>
-                                    <span class="text-gray-900 font-medium"><?php echo htmlspecialchars($record['position_title'] ?? 'N/A'); ?></span>
+                                <div class="space-y-2 mb-3">
+                                    <div class="flex items-center text-sm">
+                                        <span class="text-gray-500 w-28 text-xs">Position:</span>
+                                        <span class="text-gray-900 font-medium"><?php echo htmlspecialchars($record['position_title'] ?? 'N/A'); ?></span>
+                                    </div>
+                                    <div class="flex items-center text-sm">
+                                        <span class="text-gray-500 w-28 text-xs">Department:</span>
+                                        <span class="text-gray-900"><?php echo htmlspecialchars($record['department_name'] ?? 'N/A'); ?></span>
+                                    </div>
+                                    <div class="flex items-center text-sm">
+                                        <span class="text-gray-500 w-28 text-xs">Time-In:</span>
+                                        <span class="text-gray-900"><?php echo date('h:i A', strtotime($record['time_in'])); ?></span>
+                                    </div>
+                                    <div class="flex items-center text-sm">
+                                        <span class="text-gray-500 w-28 text-xs">Time-Out:</span>
+                                        <span class="text-gray-900"><?php echo $record['time_out'] ? date('h:i A', strtotime($record['time_out'])) : '-'; ?></span>
+                                    </div>
+                                    <div class="flex items-center text-sm">
+                                        <span class="text-gray-500 w-28 text-xs">Work Duration:</span>
+                                        <span class="text-gray-900 work-duration" data-live="<?php echo !$record['time_out'] ? '1' : '0'; ?>">
+                                            <?php echo calculateWorkHours($record['time_in'], $record['time_out']); ?>
+                                        </span>
+                                    </div>
                                 </div>
-                                <div class="flex items-center text-sm">
-                                    <span class="text-gray-500 w-24 text-xs">Department:</span>
-                                    <span class="text-gray-900"><?php echo htmlspecialchars($record['department_name'] ?? 'N/A'); ?></span>
-                                </div>
-                                <div class="flex items-center text-sm">
-                                    <span class="text-gray-500 w-24 text-xs">Time-In:</span>
-                                    <span class="text-gray-900"><?php echo htmlspecialchars($record['formatted_time_in'] ?? '-'); ?></span>
-                                </div>
-                                <div class="flex items-center text-sm">
-                                    <span class="text-gray-500 w-24 text-xs">Time-Out:</span>
-                                    <span class="text-gray-900"><?php echo htmlspecialchars($record['formatted_time_out'] ?? '-'); ?></span>
-                                </div>
-                                <div class="flex items-center text-sm">
-                                    <span class="text-gray-500 w-24 text-xs">Total Hours:</span>
-                                    <span class="text-gray-900"><?php echo $record['total_hours'] ? number_format($record['total_hours'], 2) . 'h' : '-'; ?></span>
-                                </div>
-                            </div>
 
-                            <?php if (!$record['time_out']): ?>
-                                <form method="POST" onsubmit="return confirm('Record time-out for this employee?');">
-                                    <input type="hidden" name="action" value="time_out">
-                                    <input type="hidden" name="attendance_id" value="<?php echo htmlspecialchars($record['attendance_id']); ?>">
-                                    <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors">
-                                        Time Out
-                                    </button>
-                                </form>
-                            <?php else: ?>
-                                <div class="text-center text-green-600 text-sm font-medium py-2">✓ Complete</div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
+                                <?php if (!$record['time_out']): ?>
+                                    <form method="POST" onsubmit="return confirm('Record time-out for this employee?');">
+                                        <input type="hidden" name="action" value="time_out">
+                                        <input type="hidden" name="attendance_id" value="<?php echo htmlspecialchars($record['attendance_id']); ?>">
+                                        <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors">
+                                            Time Out
+                                        </button>
+                                    </form>
+                                <?php else: ?>
+                                    <div class="text-center text-green-600 text-sm font-medium py-2">✓ Complete</div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 <?php else: ?>
                     <div class="text-center py-12 text-gray-500">
                         <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -314,29 +390,97 @@ if ($date_filter == date('Y-m-d')) {
         </main>
     </div>
 
+    <div id="logoutModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="bg-red-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Confirm Logout</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6">Are you sure you want to logout?</p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="closeLogoutModal()"
+                        class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                        Cancel
+                    </button>
+                    <a href="logout.php"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <style>
         @media (max-width: 768px) {
-            .mobile-card { display: block; }
-            .desktop-table { display: none; }
+            .mobile-card {
+                display: block;
+            }
+
+            .desktop-table {
+                display: none;
+            }
         }
+
         @media (min-width: 769px) {
-            .mobile-card { display: none; }
-            .desktop-table { display: table; }
+            .mobile-card {
+                display: none;
+            }
+
+            .desktop-table {
+                display: table;
+            }
         }
     </style>
 
     <script>
+        function calculateDuration(timeIn, timeOut) {
+            const start = new Date(timeIn);
+            const end = timeOut ? new Date(timeOut) : new Date();
+
+            const diff = end - start;
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+
+            if (hours === 0 && minutes === 0) {
+                return seconds + 's';
+            } else if (hours === 0) {
+                return minutes + 'm';
+            } else {
+                return hours + 'h ' + (minutes % 60) + 'm';
+            }
+        }
+
+        function updateLiveDurations() {
+            document.querySelectorAll('.work-duration[data-live="1"]').forEach(element => {
+                const row = element.closest('tr, .attendance-card');
+                const timeIn = row.dataset.timeIn;
+                const timeOut = row.dataset.timeOut;
+
+                if (timeIn && !timeOut) {
+                    element.textContent = calculateDuration(timeIn, null);
+                }
+            });
+        }
+
+        setInterval(updateLiveDurations, 1000);
+
         function clearFilters() {
             window.location.href = 'attendance.php';
         }
 
         function exportAttendance() {
             const today = new Date('<?php echo $date_filter; ?>');
-            const dateStr = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-            
+            const dateStr = today.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
             const rows = document.querySelectorAll('#attendanceTableBody tr');
             let visibleRecords = [];
-            
+
             rows.forEach(row => {
                 if (row.style.display !== 'none') {
                     const cells = row.querySelectorAll('td');
@@ -347,7 +491,7 @@ if ($date_filter == date('Y-m-d')) {
                         department: cells[3].textContent.trim(),
                         timeIn: cells[4].textContent.trim(),
                         timeOut: cells[5].textContent.trim(),
-                        totalHours: cells[6].textContent.trim()
+                        duration: cells[6].textContent.trim()
                     };
                     visibleRecords.push(record);
                 }
@@ -387,7 +531,7 @@ if ($date_filter == date('Y-m-d')) {
                         <thead>
                             <tr>
                                 <th>ID</th><th>Name</th><th>Position</th><th>Department</th>
-                                <th>Time In</th><th>Time Out</th><th>Hours</th>
+                                <th>Time In</th><th>Time Out</th><th>Duration</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -395,16 +539,39 @@ if ($date_filter == date('Y-m-d')) {
                                 <tr>
                                     <td>${r.id}</td><td>${r.name}</td><td>${r.position}</td>
                                     <td>${r.department}</td><td>${r.timeIn}</td><td>${r.timeOut}</td>
-                                    <td>${r.totalHours}</td>
+                                    <td>${r.duration}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
+
+                    
                 </body>
                 </html>
             `);
             printWindow.document.close();
         }
+
+        function openLogoutModal() {
+            document.getElementById('logoutModal').classList.add('active');
+        }
+
+        function closeLogoutModal() {
+            document.getElementById('logoutModal').classList.remove('active');
+        }
+
+        document.getElementById('logoutModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLogoutModal();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeLogoutModal();
+            }
+        });
     </script>
 </body>
+
 </html>

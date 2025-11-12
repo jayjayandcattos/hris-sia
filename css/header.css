@@ -7,16 +7,15 @@
 }
 
 h1 {
-  font-family: "Unbounded", sans-serif;
-  background: linear-gradient(90deg, #009C8E, #00695F, #005048, #003631);
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  padding: 15px;
+  font-family: "Kulim Park", sans-serif;
+  color: #FAF7EF;
+  background: none;
   text-align: center;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  font-size: 32px;
+  font-size: 54px;
+  letter-spacing: -0.3px;
 }
+
 
 .navbar {
   position: absolute;
@@ -24,12 +23,19 @@ h1 {
   left: 10%;
   right: 10%;
   top: 8%;
-  padding: 8px 0;   
+  padding: 8px 0;
   border-radius: 30px;
   overflow: hidden;
   align-items: center;
-  box-shadow: 0px 8px 20px 4px rgba(24, 91, 133, 0.3);
-  background: linear-gradient(90deg, #003631, #009C8E, #005048, #009C8E);
+  box-shadow: 0px 8px 20px 4px rgba(0, 0, 0, 0.429);
+  background: linear-gradient(
+    90deg,
+    #003631,
+    #005a54,
+    #00786e,
+    #005a54,
+    #003631
+  );
   display: flex;
   justify-content: space-between;
   height: 80px;
@@ -59,19 +65,9 @@ h1 {
   height: 42px;
   object-fit: cover;
   border-radius: 50%;
+  margin-right: -10px;
 }
 
-.title {
-  border-radius: 500px;
-  background: rgba(240, 248, 255, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  padding: 4px 16px;
-  height: 50px;
-  backdrop-filter: blur(10px);
-}
 
 .logo {
   width: 50px;
@@ -89,6 +85,7 @@ h1 {
 
 .date1,
 .time1 {
+  font-family: "Kulim Park", sans-serif;
   letter-spacing: 0.5px;
   line-height: 20px;
   color: #005048;
@@ -101,6 +98,7 @@ h1 {
 
 .date,
 .time {
+  font-family: "Kulim Park", sans-serif;
   border-radius: 500px;
   background-color: #f0f8ff;
   display: flex;

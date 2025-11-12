@@ -11,14 +11,14 @@ if (!isset($_SESSION['user_id'])) {
 
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-  
+
     $employee_id = $_POST['employee_id'] ?? '';
     $leave_type = $_POST['leave_type'] ?? '';
     $start_date = $_POST['start_date'] ?? '';
     $end_date = $_POST['end_date'] ?? '';
     $reason = $_POST['reason'] ?? '';
-    
-   
+
+
     $success_message = "Leave request submitted successfully!";
 }
 
@@ -71,6 +71,56 @@ $leave_requests = [
     <title>HRIS - Leave Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
+
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeInModal 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 0;
+            border-radius: 0.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes fadeInModal {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 
 <body class="bg-gray-100">
@@ -79,9 +129,10 @@ $leave_requests = [
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Leave Management</h1>
-                <a href="index.php" class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
+                <button onclick="openLogoutModal()"
+                    class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
                     Logout
-                </a>
+                </button>
             </div>
         </header>
 
@@ -118,10 +169,9 @@ $leave_requests = [
 
             <!-- Action Buttons -->
             <div class="mb-6">
-                <button 
+                <button
                     onclick="openModal()"
-                    class="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-6 py-3 rounded-lg transition duration-200"
-                >
+                    class="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-6 py-3 rounded-lg transition duration-200">
                     New Leave Request
                 </button>
             </div>
@@ -147,52 +197,52 @@ $leave_requests = [
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             <?php foreach ($leave_requests as $request): ?>
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-4 whitespace-nowrap">
-                                    <div class="font-medium text-gray-900"><?php echo htmlspecialchars($request['employee_name']); ?></div>
-                                    <div class="text-sm text-gray-500"><?php echo htmlspecialchars($request['employee_number']); ?></div>
-                                </td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    <?php echo htmlspecialchars($request['leave_type']); ?>
-                                </td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    <?php echo date('M d', strtotime($request['start_date'])); ?> - 
-                                    <?php echo date('M d, Y', strtotime($request['end_date'])); ?>
-                                </td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    <?php echo $request['days']; ?> day<?php echo $request['days'] > 1 ? 's' : ''; ?>
-                                </td>
-                                <td class="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">
-                                    <?php echo htmlspecialchars($request['reason']); ?>
-                                </td>
-                                <td class="px-4 py-4 whitespace-nowrap">
-                                    <?php 
-                                    $status_color = '';
-                                    switch($request['status']) {
-                                        case 'Pending':
-                                            $status_color = 'bg-yellow-100 text-yellow-800';
-                                            break;
-                                        case 'Approved':
-                                            $status_color = 'bg-green-100 text-green-800';
-                                            break;
-                                        case 'Rejected':
-                                            $status_color = 'bg-red-100 text-red-800';
-                                            break;
-                                    }
-                                    ?>
-                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $status_color; ?>">
-                                        <?php echo htmlspecialchars($request['status']); ?>
-                                    </span>
-                                </td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm">
-                                    <?php if ($request['status'] === 'Pending'): ?>
-                                    <button onclick="approveLeave(<?php echo $request['id']; ?>)" class="text-green-600 hover:text-green-900 mr-3">Approve</button>
-                                    <button onclick="rejectLeave(<?php echo $request['id']; ?>)" class="text-red-600 hover:text-red-900">Reject</button>
-                                    <?php else: ?>
-                                    <button onclick="viewLeave(<?php echo $request['id']; ?>)" class="text-teal-600 hover:text-teal-900">View</button>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-4 whitespace-nowrap">
+                                        <div class="font-medium text-gray-900"><?php echo htmlspecialchars($request['employee_name']); ?></div>
+                                        <div class="text-sm text-gray-500"><?php echo htmlspecialchars($request['employee_number']); ?></div>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <?php echo htmlspecialchars($request['leave_type']); ?>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <?php echo date('M d', strtotime($request['start_date'])); ?> -
+                                        <?php echo date('M d, Y', strtotime($request['end_date'])); ?>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <?php echo $request['days']; ?> day<?php echo $request['days'] > 1 ? 's' : ''; ?>
+                                    </td>
+                                    <td class="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">
+                                        <?php echo htmlspecialchars($request['reason']); ?>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap">
+                                        <?php
+                                        $status_color = '';
+                                        switch ($request['status']) {
+                                            case 'Pending':
+                                                $status_color = 'bg-yellow-100 text-yellow-800';
+                                                break;
+                                            case 'Approved':
+                                                $status_color = 'bg-green-100 text-green-800';
+                                                break;
+                                            case 'Rejected':
+                                                $status_color = 'bg-red-100 text-red-800';
+                                                break;
+                                        }
+                                        ?>
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $status_color; ?>">
+                                            <?php echo htmlspecialchars($request['status']); ?>
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm">
+                                        <?php if ($request['status'] === 'Pending'): ?>
+                                            <button onclick="approveLeave(<?php echo $request['id']; ?>)" class="text-green-600 hover:text-green-900 mr-3">Approve</button>
+                                            <button onclick="rejectLeave(<?php echo $request['id']; ?>)" class="text-red-600 hover:text-red-900">Reject</button>
+                                        <?php else: ?>
+                                            <button onclick="viewLeave(<?php echo $request['id']; ?>)" class="text-teal-600 hover:text-teal-900">View</button>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
@@ -213,21 +263,19 @@ $leave_requests = [
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Employee Number</label>
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             name="employee_id"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            required
-                        >
+                            required>
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Leave Type</label>
-                        <select 
+                        <select
                             name="leave_type"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            required
-                        >
+                            required>
                             <option value="">Select Leave Type</option>
                             <option value="Sick Leave">Sick Leave</option>
                             <option value="Vacation Leave">Vacation Leave</option>
@@ -241,47 +289,42 @@ $leave_requests = [
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                        <input 
-                            type="date" 
+                        <input
+                            type="date"
                             name="start_date"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            required
-                        >
+                            required>
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-                        <input 
-                            type="date" 
+                        <input
+                            type="date"
                             name="end_date"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            required
-                        >
+                            required>
                     </div>
                 </div>
 
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Reason</label>
-                    <textarea 
+                    <textarea
                         name="reason"
                         rows="4"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        required
-                    ></textarea>
+                        required></textarea>
                 </div>
 
                 <div class="flex justify-end gap-3">
-                    <button 
+                    <button
                         type="button"
                         onclick="closeModal()"
-                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-                    >
+                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
                         Cancel
                     </button>
-                    <button 
+                    <button
                         type="submit"
-                        class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
-                    >
+                        class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
                         Submit Request
                     </button>
                 </div>
@@ -290,6 +333,49 @@ $leave_requests = [
     </div>
 
     <script src="js/leave.js"></script>
+
+    <div id="logoutModal" class="modal">
+    <div class="modal-content max-w-md w-full mx-4">
+        <div class="bg-red-600 text-white p-4 rounded-t-lg">
+            <h2 class="text-xl font-bold">Confirm Logout</h2>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-700 mb-6">Are you sure you want to logout?</p>
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeLogoutModal()" 
+                        class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                    Cancel
+                </button>
+                <a href="logout.php" 
+                   class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                    Logout
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openLogoutModal() {
+    document.getElementById('logoutModal').classList.add('active');
+}
+
+function closeLogoutModal() {
+    document.getElementById('logoutModal').classList.remove('active');
+}
+
+document.getElementById('logoutModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeLogoutModal();
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeLogoutModal();
+    }
+});
+</script>
 </body>
 
 </html>

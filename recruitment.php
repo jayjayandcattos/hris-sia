@@ -20,9 +20,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $sql = "INSERT INTO applicant (recruitment_id, full_name, email, contact_number, 
                             resume_file, application_status) 
                             VALUES (?, ?, ?, ?, ?, ?)";
-                    
+
                     $status = !empty($_POST['interview_date']) ? 'To Interview' : 'Pending';
-                    
+
                     $params = [
                         $_POST['recruitment_id'] ?: null,
                         $_POST['full_name'],
@@ -31,13 +31,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_POST['resume_file'] ?? null,
                         $status
                     ];
-                    
+
                     $stmt = $conn->prepare($sql);
                     $success = $stmt->execute($params);
-                    
+
                     if ($success) {
                         $applicant_id = $conn->lastInsertId();
-                        
+
                         // If interview date is provided, create interview record
                         if (!empty($_POST['interview_date'])) {
                             $interviewSql = "INSERT INTO interview (applicant_id, interviewer_id, interview_date, interview_result) 
@@ -49,10 +49,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 $_POST['interview_date']
                             ]);
                         }
-                        
+
                         if (isset($logger)) {
-                            $logger->info('RECRUITMENT', 'Applicant added', 
-                                "Name: {$_POST['full_name']}");
+                            $logger->info(
+                                'RECRUITMENT',
+                                'Applicant added',
+                                "Name: {$_POST['full_name']}"
+                            );
                         }
                         $message = "Applicant added successfully!";
                         $messageType = "success";
@@ -65,17 +68,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $messageType = "error";
                 }
                 break;
-                
+
             case 'update_status':
                 try {
                     $sql = "UPDATE applicant SET application_status = ? WHERE applicant_id = ?";
                     $stmt = $conn->prepare($sql);
                     $success = $stmt->execute([$_POST['status'], $_POST['applicant_id']]);
-                    
+
                     if ($success) {
                         if (isset($logger)) {
-                            $logger->info('RECRUITMENT', 'Applicant status updated', 
-                                "ID: {$_POST['applicant_id']}, Status: {$_POST['status']}");
+                            $logger->info(
+                                'RECRUITMENT',
+                                'Applicant status updated',
+                                "ID: {$_POST['applicant_id']}, Status: {$_POST['status']}"
+                            );
                         }
                         $message = "Status updated successfully!";
                         $messageType = "success";
@@ -88,26 +94,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $messageType = "error";
                 }
                 break;
-                
+
             case 'schedule_interview':
                 try {
                     $sql = "INSERT INTO interview (applicant_id, interviewer_id, interview_date, interview_result) 
                             VALUES (?, ?, ?, 'Scheduled')";
-                    
+
                     $stmt = $conn->prepare($sql);
                     $success = $stmt->execute([
                         $_POST['applicant_id'],
                         $_SESSION['employee_id'],
                         $_POST['interview_date']
                     ]);
-                    
+
                     if ($success) {
                         // Update applicant status
                         $updateSql = "UPDATE applicant SET application_status = 'To Interview' 
                                      WHERE applicant_id = ?";
                         $updateStmt = $conn->prepare($updateSql);
                         $updateStmt->execute([$_POST['applicant_id']]);
-                        
+
                         $message = "Interview scheduled successfully!";
                         $messageType = "success";
                     }
@@ -116,18 +122,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $messageType = "error";
                 }
                 break;
-                
+
             case 'archive':
                 try {
                     $sql = "UPDATE applicant SET application_status = 'Archived', archived_at = NOW() 
                             WHERE applicant_id = ?";
                     $stmt = $conn->prepare($sql);
                     $success = $stmt->execute([$_POST['applicant_id']]);
-                    
+
                     if ($success) {
                         if (isset($logger)) {
-                            $logger->info('RECRUITMENT', 'Applicant archived', 
-                                "Applicant ID: {$_POST['applicant_id']}");
+                            $logger->info(
+                                'RECRUITMENT',
+                                'Applicant archived',
+                                "Applicant ID: {$_POST['applicant_id']}"
+                            );
                         }
                         $message = "Applicant archived successfully!";
                         $messageType = "success";
@@ -142,18 +151,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $messageType = "error";
                 }
                 break;
-                
+
             case 'unarchive':
                 try {
                     $sql = "UPDATE applicant SET application_status = 'Pending', archived_at = NULL 
                             WHERE applicant_id = ?";
                     $stmt = $conn->prepare($sql);
                     $success = $stmt->execute([$_POST['applicant_id']]);
-                    
+
                     if ($success) {
                         if (isset($logger)) {
-                            $logger->info('RECRUITMENT', 'Applicant unarchived', 
-                                "Applicant ID: {$_POST['applicant_id']}");
+                            $logger->info(
+                                'RECRUITMENT',
+                                'Applicant unarchived',
+                                "Applicant ID: {$_POST['applicant_id']}"
+                            );
                         }
                         $message = "Applicant restored successfully!";
                         $messageType = "success";
@@ -166,23 +178,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $messageType = "error";
                 }
                 break;
-                
+
             case 'delete':
                 try {
                     // First delete related interviews
                     $deleteSql = "DELETE FROM interview WHERE applicant_id = ?";
                     $deleteStmt = $conn->prepare($deleteSql);
                     $deleteStmt->execute([$_POST['applicant_id']]);
-                    
+
                     // Then delete the applicant
                     $sql = "DELETE FROM applicant WHERE applicant_id = ?";
                     $stmt = $conn->prepare($sql);
                     $success = $stmt->execute([$_POST['applicant_id']]);
-                    
+
                     if ($success) {
                         if (isset($logger)) {
-                            $logger->info('RECRUITMENT', 'Applicant deleted', 
-                                "Applicant ID: {$_POST['applicant_id']}");
+                            $logger->info(
+                                'RECRUITMENT',
+                                'Applicant deleted',
+                                "Applicant ID: {$_POST['applicant_id']}"
+                            );
                         }
                         $message = "Applicant deleted successfully!";
                         $messageType = "success";
@@ -282,22 +297,74 @@ $noRecruitments = empty($recruitments);
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HRIS - Recruitment</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeInModal 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 0;
+            border-radius: 0.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes fadeInModal {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
+
 <body class="bg-gray-100">
     <div class="min-h-screen lg:ml-64">
         <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Recruitment <?php echo $show_archived ? '- Archived' : ''; ?></h1>
-                <a href="logout.php" class="bg-white text-teal-600 px-3 py-2 rounded-lg font-medium hover:bg-gray-100 text-xs sm:text-sm">
+                <button onclick="openLogoutModal()"
+                    class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
                     Logout
-                </a>
+                </button>
             </div>
         </header>
 
@@ -315,65 +382,65 @@ $noRecruitments = empty($recruitments);
                 </div>
             <?php endif; ?>
 
-            <!-- Toggle Archive View Button -->
+
             <div class="mb-4">
-                <a href="?archived=<?php echo $show_archived ? '0' : '1'; ?>" 
-                   class="inline-block bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg font-medium text-sm">
-                    <?php echo $show_archived ? '← Back to Active Applicants' : '📦 View Archived (' . $archived_count . ')'; ?>
+                <a href="?archived=<?php echo $show_archived ? '0' : '1'; ?>"
+                    class="inline-block bg-gray-200 text-gray-700 hover:bg-gray-300 text-black px-4 py-2 rounded-lg font-medium text-sm">
+                    <?php echo $show_archived ? '← Back to Active Applicants' : 'View Archived (' . $archived_count . ')'; ?>
                 </a>
             </div>
 
             <?php if (!$show_archived): ?>
-            <!-- Statistics Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-4 lg:mb-6">
-                <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors" onclick="filterByStatus('all')">
-                    <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">Total Applicant</h3>
-                    <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $total_applicants; ?></p>
+                <!-- Statistics Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-4 lg:mb-6">
+                    <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors" onclick="filterByStatus('all')">
+                        <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">Total Applicant</h3>
+                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $total_applicants; ?></p>
+                    </div>
+                    <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors" onclick="filterByStatus('To Interview')">
+                        <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">To Interview</h3>
+                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $to_interview; ?></p>
+                    </div>
+                    <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors" onclick="filterByStatus('To Evaluate')">
+                        <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">To Evaluate</h3>
+                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $to_evaluate; ?></p>
+                    </div>
                 </div>
-                <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors" onclick="filterByStatus('To Interview')">
-                    <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">To Interview</h3>
-                    <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $to_interview; ?></p>
-                </div>
-                <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors" onclick="filterByStatus('To Evaluate')">
-                    <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">To Evaluate</h3>
-                    <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $to_evaluate; ?></p>
-                </div>
-            </div>
             <?php endif; ?>
 
             <!-- Filter and Search Section -->
             <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6 mb-4 lg:mb-6">
                 <?php if (!$show_archived): ?>
-                <form method="GET" id="filterForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                    <input type="text" name="position" value="<?php echo htmlspecialchars($position_filter); ?>" 
-                        placeholder="Position"
-                        onchange="this.form.submit()"
-                        class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
-                    <input type="text" name="department" value="<?php echo htmlspecialchars($department_filter); ?>" 
-                        placeholder="Department"
-                        onchange="this.form.submit()"
-                        class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
-                    <select name="status" onchange="this.form.submit()" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
-                        <option value="">All Status</option>
-                        <option value="Pending" <?php echo $status_filter === 'Pending' ? 'selected' : ''; ?>>Pending</option>
-                        <option value="To Interview" <?php echo $status_filter === 'To Interview' ? 'selected' : ''; ?>>To Interview</option>
-                        <option value="To Evaluate" <?php echo $status_filter === 'To Evaluate' ? 'selected' : ''; ?>>To Evaluate</option>
-                        <option value="Hired" <?php echo $status_filter === 'Hired' ? 'selected' : ''; ?>>Hired</option>
-                        <option value="Rejected" <?php echo $status_filter === 'Rejected' ? 'selected' : ''; ?>>Rejected</option>
-                    </select>
-                    <div class="flex gap-2">
-                        <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium text-sm">
-                            <span class="hidden sm:inline">Search</span>
-                            <span class="sm:hidden">🔍</span>
-                        </button>
-                        <button type="button" onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium text-sm">
-                            Clear
-                        </button>
-                        <button type="button" onclick="openAddModal()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
-                            + Add
-                        </button>
-                    </div>
-                </form>
+                    <form method="GET" id="filterForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                        <input type="text" name="position" value="<?php echo htmlspecialchars($position_filter); ?>"
+                            placeholder="Position"
+                            onchange="this.form.submit()"
+                            class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
+                        <input type="text" name="department" value="<?php echo htmlspecialchars($department_filter); ?>"
+                            placeholder="Department"
+                            onchange="this.form.submit()"
+                            class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
+                        <select name="status" onchange="this.form.submit()" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
+                            <option value="">All Status</option>
+                            <option value="Pending" <?php echo $status_filter === 'Pending' ? 'selected' : ''; ?>>Pending</option>
+                            <option value="To Interview" <?php echo $status_filter === 'To Interview' ? 'selected' : ''; ?>>To Interview</option>
+                            <option value="To Evaluate" <?php echo $status_filter === 'To Evaluate' ? 'selected' : ''; ?>>To Evaluate</option>
+                            <option value="Hired" <?php echo $status_filter === 'Hired' ? 'selected' : ''; ?>>Hired</option>
+                            <option value="Rejected" <?php echo $status_filter === 'Rejected' ? 'selected' : ''; ?>>Rejected</option>
+                        </select>
+                        <div class="flex gap-2">
+                            <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium text-sm">
+                                <span class="hidden sm:inline">Search</span>
+                                <span class="sm:hidden">🔍</span>
+                            </button>
+                            <button type="button" onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium text-sm">
+                                Clear
+                            </button>
+                            <button type="button" onclick="openAddModal()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
+                                + Add
+                            </button>
+                        </div>
+                    </form>
                 <?php endif; ?>
 
                 <!-- Desktop Table -->
@@ -402,7 +469,7 @@ $noRecruitments = empty($recruitments);
                                     <td class="px-3 py-2 text-sm"><?php echo $applicant['interview_date'] ? date('M d, Y', strtotime($applicant['interview_date'])) : '-'; ?></td>
                                     <td class="px-3 py-2">
                                         <span class="px-2 py-1 text-xs font-medium rounded-full 
-                                            <?php 
+                                            <?php
                                             if ($applicant['application_status'] === 'Pending') echo 'bg-blue-100 text-blue-800';
                                             elseif ($applicant['application_status'] === 'To Interview') echo 'bg-yellow-100 text-yellow-800';
                                             elseif ($applicant['application_status'] === 'To Evaluate') echo 'bg-purple-100 text-purple-800';
@@ -456,7 +523,7 @@ $noRecruitments = empty($recruitments);
                                     <p class="text-xs text-gray-500">ID: <?php echo $applicant['applicant_id']; ?></p>
                                 </div>
                                 <span class="px-2 py-1 text-xs font-medium rounded-full 
-                                    <?php 
+                                    <?php
                                     if ($applicant['application_status'] === 'Pending') echo 'bg-blue-100 text-blue-800';
                                     elseif ($applicant['application_status'] === 'To Interview') echo 'bg-yellow-100 text-yellow-800';
                                     elseif ($applicant['application_status'] === 'To Evaluate') echo 'bg-purple-100 text-purple-800';
@@ -674,12 +741,23 @@ $noRecruitments = empty($recruitments);
 
     <style>
         @media (max-width: 768px) {
-            .mobile-card { display: block; }
-            .desktop-table { display: none; }
+            .mobile-card {
+                display: block;
+            }
+
+            .desktop-table {
+                display: none;
+            }
         }
+
         @media (min-width: 769px) {
-            .mobile-card { display: none; }
-            .desktop-table { display: table; }
+            .mobile-card {
+                display: none;
+            }
+
+            .desktop-table {
+                display: table;
+            }
         }
     </style>
 
@@ -764,6 +842,49 @@ $noRecruitments = empty($recruitments);
         function closeDeleteModal() {
             document.getElementById('deleteModal').classList.add('hidden');
         }
+
+        function openLogoutModal() {
+            document.getElementById('logoutModal').classList.add('active');
+        }
+
+        function closeLogoutModal() {
+            document.getElementById('logoutModal').classList.remove('active');
+        }
+
+        document.getElementById('logoutModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLogoutModal();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeLogoutModal();
+            }
+        });
     </script>
+
+    <div id="logoutModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="bg-red-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Confirm Logout</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6">Are you sure you want to logout?</p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="closeLogoutModal()"
+                        class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                        Cancel
+                    </button>
+                    <a href="logout.php"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </body>
+
 </html>

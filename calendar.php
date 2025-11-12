@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     // Create recruitment event
                     $sql = "INSERT INTO recruitment (job_title, department_id, date_posted, status, posted_by) 
                             VALUES (?, ?, ?, 'Open', ?)";
-                    
+
                     $stmt = $conn->prepare($sql);
                     $success = $stmt->execute([
                         $_POST['event_name'],
@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_POST['event_start'],
                         $_SESSION['employee_id']
                     ]);
-                    
+
                     if ($success) {
                         if (isset($logger)) {
                             $logger->info('CALENDAR', 'Event added', "Event: {$_POST['event_name']}");
@@ -43,13 +43,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     exit;
                 }
                 break;
-                
+
             case 'update_event':
                 try {
                     $sql = "UPDATE recruitment 
                             SET job_title = ?, department_id = ?, date_posted = ? 
                             WHERE recruitment_id = ?";
-                    
+
                     $stmt = $conn->prepare($sql);
                     $success = $stmt->execute([
                         $_POST['event_name'],
@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_POST['event_start'],
                         $_POST['event_id']
                     ]);
-                    
+
                     if ($success) {
                         if (isset($logger)) {
                             $logger->info('CALENDAR', 'Event updated', "ID: {$_POST['event_id']}");
@@ -73,13 +73,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     exit;
                 }
                 break;
-                
+
             case 'delete_event':
                 try {
                     $sql = "DELETE FROM recruitment WHERE recruitment_id = ?";
                     $stmt = $conn->prepare($sql);
                     $success = $stmt->execute([$_POST['event_id']]);
-                    
+
                     if ($success) {
                         if (isset($logger)) {
                             $logger->info('CALENDAR', 'Event deleted', "ID: {$_POST['event_id']}");
@@ -128,22 +128,75 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HRIS - Calendar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
+
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeInModal 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 0;
+            border-radius: 0.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes fadeInModal {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
+
 <body class="bg-gray-100">
     <div class="min-h-screen lg:ml-64">
         <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Calendar</h1>
-                <a href="logout.php" class="bg-white text-teal-600 px-3 py-2 rounded-lg font-medium hover:bg-gray-100 text-xs sm:text-sm">
+                <button onclick="openLogoutModal()"
+                    class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
                     Logout
-                </a>
+                </button>
             </div>
         </header>
 
@@ -497,21 +550,21 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
 
         async function submitEvent(e) {
             e.preventDefault();
-            
+
             const formData = new FormData();
             formData.append('action', 'add_event');
             formData.append('event_name', document.getElementById('eventName').value);
             formData.append('department_id', document.getElementById('eventDepartment').value);
             formData.append('event_start', document.getElementById('eventStart').value);
-            
+
             try {
                 const response = await fetch('calendar.php', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     closeAddEventModal();
                     showSuccess('Event has been added successfully.');
@@ -540,22 +593,22 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
 
         async function updateEvent(e) {
             e.preventDefault();
-            
+
             const formData = new FormData();
             formData.append('action', 'update_event');
             formData.append('event_id', document.getElementById('editEventId').value);
             formData.append('event_name', document.getElementById('editEventName').value);
             formData.append('department_id', document.getElementById('editEventDepartment').value);
             formData.append('event_start', document.getElementById('editEventStart').value);
-            
+
             try {
                 const response = await fetch('calendar.php', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     closeEditEventModal();
                     showSuccess('Event has been updated successfully.');
@@ -570,19 +623,19 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
 
         async function deleteEvent() {
             if (!confirm('Are you sure you want to delete this event?')) return;
-            
+
             const formData = new FormData();
             formData.append('action', 'delete_event');
             formData.append('event_id', document.getElementById('editEventId').value);
-            
+
             try {
                 const response = await fetch('calendar.php', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     closeEditEventModal();
                     showSuccess('Event has been deleted successfully.');
@@ -603,6 +656,48 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
         function closeSuccessModal() {
             document.getElementById('successModal').classList.add('hidden');
         }
+
+        function openLogoutModal() {
+            document.getElementById('logoutModal').classList.add('active');
+        }
+
+        function closeLogoutModal() {
+            document.getElementById('logoutModal').classList.remove('active');
+        }
+
+        document.getElementById('logoutModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLogoutModal();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeLogoutModal();
+            }
+        });
     </script>
+
+    <div id="logoutModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="bg-red-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Confirm Logout</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6">Are you sure you want to logout?</p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="closeLogoutModal()"
+                        class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                        Cancel
+                    </button>
+                    <a href="logout.php"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
+
 </html>

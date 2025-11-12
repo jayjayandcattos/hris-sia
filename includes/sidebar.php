@@ -175,44 +175,6 @@
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.4s ease;
     }
 
-    #sidebar nav a {
-        opacity: 0;
-        animation: slideInLeft 0.5s ease forwards;
-    }
-
-    #sidebar nav a:nth-child(1) {
-        animation-delay: 0.1s;
-    }
-
-    #sidebar nav a:nth-child(2) {
-        animation-delay: 0.2s;
-    }
-
-    #sidebar nav a:nth-child(3) {
-        animation-delay: 0.3s;
-    }
-
-    #sidebar nav a:nth-child(4) {
-        animation-delay: 0.4s;
-    }
-
-    #sidebar nav a:nth-child(5) {
-        animation-delay: 0.5s;
-    }
-
-    @keyframes slideInLeft {
-        from {
-            opacity: 0;
-            transform: translateX(-20px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-
-
     #sidebar {
         scrollbar-width: thin;
         scrollbar-color: rgba(15, 118, 110, 0.3) transparent;
@@ -257,7 +219,7 @@
 
 
     <div class="p-6 border-b border-gray-200 text-center pt-16 lg:pt-6">
-        <img src="./assets/Kise.gif"
+        <img src="./assets/tempfp.jpg"
             alt="Profile"
             class="w-20 h-20 rounded-full mx-auto mb-3 object-cover shadow-md">
 
@@ -279,8 +241,8 @@
             'attendance.php' => 'Attendance',
             'leave.php' => 'Leave',
             'recruitment.php' => 'Recruitment',
-            'calendar.php' => 'Calendar'
-
+            'calendar.php' => 'Calendar',
+            'logs.php' => 'Logs'
         ];
 
         foreach ($menu_items as $page => $label):
@@ -310,7 +272,7 @@
     function closeSidebarFunc() {
         sidebar.classList.add('-translate-x-full');
         overlay.classList.add('hidden');
-        document.body.style.overflow = ''; // Restore scrolling
+        document.body.style.overflow = '';
     }
 
 
