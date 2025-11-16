@@ -2,11 +2,11 @@
 session_start();
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
-require_once 'config/database.php';
+require_once '../config/database.php';
 
 if (isset($logger)) {
     $logger->debug('PAGE', 'Dashboard accessed', 'User: ' . ($_SESSION['username'] ?? 'unknown'));
@@ -127,7 +127,7 @@ $chartData = [
     <title>HRIS - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
@@ -380,7 +380,7 @@ $chartData = [
     <div class="min-h-screen lg:ml-64">
         <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
-                <?php include 'includes/sidebar.php'; ?>
+                <?php include '../includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">Dashboard</h1>
                 <button onclick="openLogoutModal()" 
                    class="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg font-semibold text-red-600 hover:text-red-700 hover:bg-white transition-all duration-200 text-xs sm:text-sm shadow-lg hover:shadow-xl transform hover:scale-105">
@@ -454,7 +454,7 @@ $chartData = [
                             class="px-5 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-all duration-200 font-medium shadow-sm hover:shadow">
                         Cancel
                     </button>
-                    <a href="logout.php" 
+                    <a href="../logout.php" 
                        class="px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg transform hover:scale-105">
                         <i class="fas fa-sign-out-alt mr-2"></i>Logout
                     </a>

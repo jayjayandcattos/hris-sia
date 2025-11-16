@@ -1,11 +1,12 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
-require_once 'config/database.php';
+require_once '../config/database.php';
+require_once '../includes/auth.php';
 
 $message = '';
 $messageType = '';
@@ -14,6 +15,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'add':
+                if (!canManageEmployees()) {
+                    header('Location: employees.php');
+                    exit;
+                }
                 try {
                     $sql = "INSERT INTO employee (first_name, last_name, middle_name, gender, birth_date, 
                             contact_number, email, address, hire_date, department_id, position_id, employment_status) 
@@ -60,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'edit':
+                requireAdmin();
                 try {
                     $sql = "UPDATE employee SET 
                             first_name = ?, last_name = ?, middle_name = ?, gender = ?, 
@@ -107,6 +113,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'archive':
+                if (!canManageEmployees()) {
+                    header('Location: employees.php');
+                    exit;
+                }
                 try {
                     $sql = "UPDATE employee SET employment_status = 'Inactive' WHERE employee_id = ?";
                     $stmt = $conn->prepare($sql);
@@ -131,6 +141,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'unarchive':
+                if (!canManageEmployees()) {
+                    header('Location: employees.php');
+                    exit;
+                }
                 try {
                     $sql = "UPDATE employee SET employment_status = 'Active' WHERE employee_id = ?";
                     $stmt = $conn->prepare($sql);
@@ -205,7 +219,7 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HRIS - Employees</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
@@ -379,7 +393,7 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
     <div class="min-h-screen lg:ml-64">
         <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
-                <?php include 'includes/sidebar.php'; ?>
+                <?php include '../includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">
                     <i class="fas fa-users mr-2"></i>Employee Management
                 </h1>
@@ -424,7 +438,7 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                         <button type="button" onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200">
                             <i class="fas fa-times mr-2"></i>Clear
                         </button>
-                        <?php if ($view === 'active'): ?>
+                        <?php if ($view === 'active' && canManageEmployees()): ?>
                         <button type="button" onclick="openAddModal()" class="btn-primary text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
                             <i class="fas fa-plus mr-2"></i>Add Employee
                         </button>
@@ -464,15 +478,19 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                                         <td class="px-3 py-2">
                                             <div class="flex gap-2">
                                                 <?php if ($view === 'active'): ?>
+                                                    <?php if (isAdmin()): ?>
                                                     <button onclick='editEmployee(<?php echo json_encode($emp); ?>)'
                                                         class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200">
                                                         <i class="fas fa-edit mr-1"></i>Edit
                                                     </button>
+                                                    <?php endif; ?>
+                                                    <?php if (canManageEmployees()): ?>
                                                     <button onclick="openArchiveModal(<?php echo $emp['employee_id']; ?>, '<?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?>')"
                                                         class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200">
                                                         <i class="fas fa-archive mr-1"></i>Archive
                                                     </button>
-                                                <?php else: ?>
+                                                    <?php endif; ?>
+                                                <?php elseif ($view === 'archived' && canManageEmployees()): ?>
                                                     <button onclick="openUnarchiveModal(<?php echo $emp['employee_id']; ?>, '<?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?>')"
                                                         class="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200">
                                                         <i class="fas fa-undo mr-1"></i>Restore
@@ -509,15 +527,19 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                                 </div>
                                 <div class="flex gap-2">
                                     <?php if ($view === 'active'): ?>
+                                        <?php if (isAdmin()): ?>
                                         <button onclick='editEmployee(<?php echo json_encode($emp); ?>)'
                                             class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
                                             Edit
                                         </button>
+                                        <?php endif; ?>
+                                        <?php if (canManageEmployees()): ?>
                                         <button onclick="openArchiveModal(<?php echo $emp['employee_id']; ?>, '<?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?>')"
                                             class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm">
                                             Archive
                                         </button>
-                                    <?php else: ?>
+                                        <?php endif; ?>
+                                    <?php elseif ($view === 'archived' && canManageEmployees()): ?>
                                         <button onclick="openUnarchiveModal(<?php echo $emp['employee_id']; ?>, '<?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?>')"
                                             class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm">
                                             Restore
@@ -681,7 +703,7 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                             class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
                         Cancel
                     </button>
-                    <a href="logout.php" 
+                    <a href="../logout.php" 
                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
                         Logout
                     </a>
@@ -842,8 +864,8 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
         </div>
     </div>
 
-    <script src="js/modal.js"></script>
-    <script src="js/employee.js"></script>
+    <script src="../js/modal.js"></script>
+    <script src="../js/employee.js"></script>
 </body>
 
 </html>

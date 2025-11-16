@@ -1,3 +1,8 @@
+<?php
+if (!isset($auth_included)) {
+    require_once __DIR__ . '/auth.php';
+}
+?>
 <style>
     header {
         position: relative !important;
@@ -252,7 +257,11 @@
 
 
     <div class="p-6 border-b border-gray-200 text-center pt-16 lg:pt-6">
-        <img src="./assets/PFP1.jpg"
+        <?php
+        // Determine asset path based on current location
+        $asset_path = (strpos($_SERVER['PHP_SELF'], '/pages/') !== false) ? '../assets/' : 'assets/';
+        ?>
+        <img src="<?php echo $asset_path; ?>PFP1.jpg"
             alt="Profile"
             class="w-20 h-20 rounded-full mx-auto mb-3 object-cover shadow-md">
 
@@ -268,6 +277,10 @@
     <nav class="p-4">
         <?php
         $current_page = basename($_SERVER['PHP_SELF']);
+        // Determine base path - if we're in pages/, use relative paths, otherwise use pages/ prefix
+        $is_in_pages = (strpos($_SERVER['PHP_SELF'], '/pages/') !== false || strpos($_SERVER['PHP_SELF'], '\\pages\\') !== false);
+        $base_path = $is_in_pages ? '' : 'pages/';
+        
         $menu_items = [
             'dashboard.php' => 'Dashboard',
             'employees.php' => 'Employee',
@@ -279,10 +292,15 @@
         ];
 
         foreach ($menu_items as $page => $label):
+            // Hide Logs for HR Manager
+            if ($page === 'logs.php' && !canViewLogs()) {
+                continue;
+            }
             $is_active = ($current_page === $page);
             $active_class = $is_active ? 'bg-teal-700 text-white font-medium' : 'bg-gray-100 text-gray-700 hover:bg-gray-200';
+            $full_path = $base_path . $page;
         ?>
-            <a href="<?php echo $page; ?>"
+            <a href="<?php echo $full_path; ?>"
                 class="block px-4 py-3 mb-2 rounded-lg <?php echo $active_class; ?> text-sm lg:text-base transition-colors">
                 <?php echo $label; ?>
             </a>

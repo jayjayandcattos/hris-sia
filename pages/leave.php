@@ -2,11 +2,12 @@
 session_start();
 
 if (!isset($_SESSION['user_id'])) {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
-require_once 'config/database.php';
+require_once '../config/database.php';
+require_once '../includes/auth.php';
 
 $message = '';
 $messageType = '';
@@ -17,6 +18,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'add':
+                if (!canManageLeaves()) {
+                    header('Location: leave.php');
+                    exit;
+                }
                 try {
                     $employee_id = $_POST['employee_id'] ?? '';
                     $leave_type_id = $_POST['leave_type_id'] ?? '';
@@ -83,6 +88,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'approve':
+                if (!canManageLeaves()) {
+                    header('Location: leave.php');
+                    exit;
+                }
                 try {
                     $leave_request_id = $_POST['leave_request_id'] ?? '';
                     $approver_id = $_SESSION['user_id'] ?? null;
@@ -119,6 +128,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'reject':
+                if (!canManageLeaves()) {
+                    header('Location: leave.php');
+                    exit;
+                }
                 try {
                     $leave_request_id = $_POST['leave_request_id'] ?? '';
                     $approver_id = $_SESSION['user_id'] ?? null;
@@ -308,7 +321,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HRIS - Leave Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
@@ -499,7 +512,7 @@ try {
     <div class="min-h-screen lg:ml-64">
         <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
-                <?php include 'includes/sidebar.php'; ?>
+                <?php include '../includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">
                     <i class="fas fa-calendar-check mr-2"></i>Leave Management
                 </h1>
@@ -566,11 +579,13 @@ try {
             <!-- Action Buttons and Filters -->
             <div class="card-enhanced p-4 lg:p-6 mb-4 lg:mb-6">
                 <div class="flex flex-wrap gap-2 mb-4">
+                    <?php if (canManageLeaves()): ?>
                     <button
                         onclick="openModal()"
                         class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all duration-200">
                         <i class="fas fa-plus mr-2"></i>New Leave Request
                     </button>
+                    <?php endif; ?>
                     <?php if ($filter_type): ?>
                         <a href="leave.php" class="bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-lg font-medium text-sm">
                             Clear Filter
@@ -774,7 +789,7 @@ try {
                                         </div>
                                     <?php endif; ?>
                                 </div>
-                                <?php if ($status === 'Pending'): ?>
+                                <?php if ($status === 'Pending' && canManageLeaves()): ?>
                                     <div class="flex gap-2">
                                         <button type="button" onclick="showConfirmApprove(<?php echo $request['leave_request_id']; ?>)" 
                                                 class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm">
@@ -884,8 +899,8 @@ try {
         </div>
     </div>
 
-    <script src="js/modal.js"></script>
-    <script src="js/leave.js"></script>
+    <script src="../js/modal.js"></script>
+    <script src="../js/leave.js"></script>
 
     <!-- Alert Modal -->
     <div id="alertModal" class="modal">
@@ -939,7 +954,7 @@ try {
                         class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
                     Cancel
                 </button>
-                <a href="logout.php" 
+                <a href="../logout.php" 
                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
                     Logout
                 </a>

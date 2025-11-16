@@ -1,11 +1,12 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
-require_once 'config/database.php';
+require_once '../config/database.php';
+require_once '../includes/auth.php';
 
 $message = '';
 $messageType = '';
@@ -15,6 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'add':
+                if (!canManageRecruitment()) {
+                    header('Location: recruitment.php');
+                    exit;
+                }
                 try {
                     // Insert applicant
                     $sql = "INSERT INTO applicant (recruitment_id, full_name, email, contact_number, 
@@ -70,6 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'update_status':
+                if (!canManageRecruitment()) {
+                    header('Location: recruitment.php');
+                    exit;
+                }
                 try {
                     $sql = "UPDATE applicant SET application_status = ? WHERE applicant_id = ?";
                     $stmt = $conn->prepare($sql);
@@ -96,6 +105,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'schedule_interview':
+                if (!canManageRecruitment()) {
+                    header('Location: recruitment.php');
+                    exit;
+                }
                 try {
                     $sql = "INSERT INTO interview (applicant_id, interviewer_id, interview_date, interview_result) 
                             VALUES (?, ?, ?, 'Scheduled')";
@@ -124,6 +137,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'archive':
+                if (!canManageRecruitment()) {
+                    header('Location: recruitment.php');
+                    exit;
+                }
                 try {
                     $sql = "UPDATE applicant SET application_status = 'Archived', archived_at = NOW() 
                             WHERE applicant_id = ?";
@@ -153,6 +170,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'unarchive':
+                if (!canManageRecruitment()) {
+                    header('Location: recruitment.php');
+                    exit;
+                }
                 try {
                     $sql = "UPDATE applicant SET application_status = 'Pending', archived_at = NULL 
                             WHERE applicant_id = ?";
@@ -180,6 +201,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'delete':
+                if (!canManageRecruitment()) {
+                    header('Location: recruitment.php');
+                    exit;
+                }
                 try {
                     // First delete related interviews
                     $deleteSql = "DELETE FROM interview WHERE applicant_id = ?";
@@ -307,7 +332,7 @@ $noRecruitments = empty($recruitments);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HRIS - Recruitment</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
@@ -472,7 +497,7 @@ $noRecruitments = empty($recruitments);
     <div class="min-h-screen lg:ml-64">
         <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
-                <?php include 'includes/sidebar.php'; ?>
+                <?php include '../includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">
                     <i class="fas fa-user-tie mr-2"></i>Recruitment <?php echo $show_archived ? '- Archived' : ''; ?>
                 </h1>
@@ -560,9 +585,11 @@ $noRecruitments = empty($recruitments);
                             <button type="button" onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200">
                                 <i class="fas fa-times mr-2"></i>Clear
                             </button>
+                            <?php if (canManageRecruitment()): ?>
                             <button type="button" onclick="openAddModal()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all duration-200">
                                 <i class="fas fa-plus mr-2"></i>Add
                             </button>
+                            <?php endif; ?>
                         </div>
                     </form>
                 <?php endif; ?>
@@ -610,24 +637,26 @@ $noRecruitments = empty($recruitments);
                                                 class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
                                                 View
                                             </button>
-                                            <?php if ($show_archived): ?>
-                                                <button onclick='unarchiveApplicant(<?php echo $applicant['applicant_id']; ?>)'
-                                                    class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">
-                                                    Restore
-                                                </button>
-                                                <button onclick='deleteApplicant(<?php echo $applicant['applicant_id']; ?>)'
-                                                    class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs">
-                                                    Delete
-                                                </button>
-                                            <?php else: ?>
-                                                <button onclick='updateStatus(<?php echo json_encode($applicant); ?>)'
-                                                    class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">
-                                                    Update
-                                                </button>
-                                                <button onclick='archiveApplicant(<?php echo $applicant['applicant_id']; ?>)'
-                                                    class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs">
-                                                    Archive
-                                                </button>
+                                            <?php if (canManageRecruitment()): ?>
+                                                <?php if ($show_archived): ?>
+                                                    <button onclick='unarchiveApplicant(<?php echo $applicant['applicant_id']; ?>)'
+                                                        class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">
+                                                        Restore
+                                                    </button>
+                                                    <button onclick='deleteApplicant(<?php echo $applicant['applicant_id']; ?>)'
+                                                        class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs">
+                                                        Delete
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button onclick='updateStatus(<?php echo json_encode($applicant); ?>)'
+                                                        class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">
+                                                        Update
+                                                    </button>
+                                                    <button onclick='archiveApplicant(<?php echo $applicant['applicant_id']; ?>)'
+                                                        class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs">
+                                                        Archive
+                                                    </button>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                         </div>
                                     </td>
@@ -666,23 +695,25 @@ $noRecruitments = empty($recruitments);
                             </div>
                             <div class="flex gap-2">
                                 <button onclick='viewApplicant(<?php echo json_encode($applicant); ?>)'
-                                    class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
+class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
                                     View
                                 </button>
-                                <?php if ($show_archived): ?>
-                                    <button onclick='unarchiveApplicant(<?php echo $applicant['applicant_id']; ?>)'
-                                        class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm">
-                                        Restore
-                                    </button>
-                                <?php else: ?>
-                                    <button onclick='updateStatus(<?php echo json_encode($applicant); ?>)'
-                                        class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm">
-                                        Update
-                                    </button>
-                                    <button onclick='archiveApplicant(<?php echo $applicant['applicant_id']; ?>)'
-                                        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm">
-                                        📦
-                                    </button>
+                                <?php if (canManageRecruitment()): ?>
+                                    <?php if ($show_archived): ?>
+                                        <button onclick='unarchiveApplicant(<?php echo $applicant['applicant_id']; ?>)'
+                                            class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm">
+                                            Restore
+                                        </button>
+                                    <?php else: ?>
+                                        <button onclick='updateStatus(<?php echo json_encode($applicant); ?>)'
+                                            class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm">
+                                            Update
+                                        </button>
+                                        <button onclick='archiveApplicant(<?php echo $applicant['applicant_id']; ?>)'
+                                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm">
+                                            📦
+                                        </button>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -1000,7 +1031,7 @@ $noRecruitments = empty($recruitments);
                         class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
                         Cancel
                     </button>
-                    <a href="logout.php"
+                    <a href="../logout.php"
                         class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
                         Logout
                     </a>

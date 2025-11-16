@@ -15,7 +15,7 @@ session_set_cookie_params([
 session_start();
 
 if (isset($_SESSION['user_id']) && isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
-    header('Location: dashboard.php');
+    header('Location: pages/dashboard.php');
     exit;
 }
 
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (!empty($username) && !empty($password)) {
             $result = loginUser($conn, $username, $password);
             if ($result['success']) {
-                header('Location: dashboard.php');
+                header('Location: pages/dashboard.php');
                 exit;
             } else {
                 $error_message = $result['message'];
@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <img src="assets/LOGO.png" alt="HRIS Logo" class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-full" loading="lazy">
             </div>
 
-            <h2 class="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-6 sm:mb-8">Admin Login</h2>
+            <h2 class="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-6 sm:mb-8">Management Login</h2>
 
             <?php if ($error_message && $show_admin_form): ?>
                 <div class="bg-red-100 border border-red-400 text-red-700 px-3 py-2 sm:px-4 sm:py-3 rounded mb-4 text-center text-sm sm:text-base">

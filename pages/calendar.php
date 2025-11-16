@@ -1,11 +1,12 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
-require_once 'config/database.php';
+require_once '../config/database.php';
+require_once '../includes/auth.php';
 
 $message = '';
 $messageType = '';
@@ -15,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'add_event':
+                requireAdmin();
                 try {
                     // Create recruitment event
                     $sql = "INSERT INTO recruitment (job_title, department_id, date_posted, status, posted_by) 
@@ -45,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'update_event':
+                requireAdmin();
                 try {
                     $sql = "UPDATE recruitment 
                             SET job_title = ?, department_id = ?, date_posted = ? 
@@ -75,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'delete_event':
+                requireAdmin();
                 try {
                     $sql = "DELETE FROM recruitment WHERE recruitment_id = ?";
                     $stmt = $conn->prepare($sql);
@@ -134,7 +138,7 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HRIS - Calendar</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
@@ -237,7 +241,7 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
     <div class="min-h-screen lg:ml-64">
         <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
-                <?php include 'includes/sidebar.php'; ?>
+                <?php include '../includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">
                     <i class="fas fa-calendar-alt mr-2"></i>Calendar
                 </h1>
@@ -275,9 +279,11 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
                         <button onclick="nextPeriod()" class="bg-teal-700 hover:bg-teal-800 text-white px-3 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200">
                             <i class="fas fa-chevron-right"></i>
                         </button>
+                        <?php if (isAdmin()): ?>
                         <button onclick="openAddEventModal()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all duration-200">
                             <i class="fas fa-plus mr-2"></i>Add Event
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -377,12 +383,14 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                     </div>
                     <div class="flex gap-3">
+                        <?php if (isAdmin()): ?>
                         <button type="submit" class="flex-1 bg-teal-700 hover:bg-teal-800 text-white px-4 py-3 rounded-lg font-medium">
                             Update
                         </button>
                         <button type="button" onclick="deleteEvent()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-lg font-medium">
                             Delete
                         </button>
+                        <?php endif; ?>
                         <button type="button" onclick="closeEditEventModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium">
                             Cancel
                         </button>
@@ -432,9 +440,10 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
         </div>
     </div>
 
-    <script src="js/modal.js"></script>
+    <script src="../js/modal.js"></script>
     <script>
         let events = <?php echo json_encode($events); ?>;
+        let isAdmin = <?php echo isAdmin() ? 'true' : 'false'; ?>;
         let currentView = 'yearly';
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
@@ -563,7 +572,7 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
             } else {
                 noEvents.classList.add('hidden');
                 container.innerHTML = monthEvents.map(e => `
-                    <div class="bg-teal-800 text-white rounded-lg p-4 hover:bg-teal-700 transition-colors cursor-pointer" onclick="openEditEventModal(${e.id})">
+                    <div class="bg-teal-800 text-white rounded-lg p-4 hover:bg-teal-700 transition-colors ${isAdmin ? 'cursor-pointer' : ''}" ${isAdmin ? `onclick="openEditEventModal(${e.id})"` : ''}>
                         <h4 class="font-semibold text-lg mb-1">${e.name}</h4>
                         <p class="text-sm opacity-90">${formatDate(e.start)}</p>
                         ${e.department ? `<p class="text-xs opacity-75 mt-1">${e.department}</p>` : ''}
@@ -766,7 +775,7 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
                         class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
                         Cancel
                     </button>
-                    <a href="logout.php"
+                    <a href="../logout.php"
                         class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
                         Logout
                     </a>

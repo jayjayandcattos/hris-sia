@@ -1,11 +1,12 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
-require_once 'config/database.php';
+require_once '../config/database.php';
+require_once '../includes/auth.php';
 
 $message = '';
 $messageType = '';
@@ -14,6 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'time_out':
+                if (!isAdmin()) {
+                    $message = "NO PERMISSIONS: You do not have permission to perform this action.";
+                    $messageType = "error";
+                    break;
+                }
                 try {
                     $sql = "UPDATE attendance 
                             SET time_out = NOW()
@@ -150,7 +156,7 @@ if ($date_filter == date('Y-m-d')) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HRIS - Attendance</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
@@ -316,7 +322,7 @@ if ($date_filter == date('Y-m-d')) {
     <div class="min-h-screen lg:ml-64">
         <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
-                <?php include 'includes/sidebar.php'; ?>
+                <?php include '../includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">
                     <i class="fas fa-clock mr-2"></i>Attendance
                 </h1>
@@ -524,7 +530,7 @@ if ($date_filter == date('Y-m-d')) {
                         class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
                         Cancel
                     </button>
-                    <a href="logout.php"
+                    <a href="../logout.php"
                         class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
                         Logout
                     </a>
@@ -695,6 +701,12 @@ if ($date_filter == date('Y-m-d')) {
         });
 
         function showConfirmTimeOut(attendanceId) {
+            <?php if (!isAdmin()): ?>
+            // HR Manager - Show permission denied message
+            showAlertModal('NO PERMISSIONS: You do not have permission to perform this action.', 'error');
+            return;
+            <?php endif; ?>
+            
             showConfirmModal(
                 'Record time-out for this employee?',
                 function() {
@@ -751,7 +763,7 @@ if ($date_filter == date('Y-m-d')) {
         </div>
     </div>
 
-    <script src="js/modal.js"></script>
+    <script src="../js/modal.js"></script>
 </body>
 
 </html>

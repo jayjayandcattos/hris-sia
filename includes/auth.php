@@ -39,8 +39,8 @@ function loginUser($conn, $username, $password) {
         $_SESSION['employee_id'] = $user['employee_id'];
         $_SESSION['username'] = $user['username'];
         $_SESSION['user_role'] = $user['role'];
-        $_SESSION['user_name'] = trim(($user['first_name'] ?? 'Admin') . ' ' . ($user['last_name'] ?? 'User'));
-        $_SESSION['is_admin'] = true;
+        $_SESSION['user_name'] = trim(($user['first_name'] ?? 'Justin') . ' ' . ($user['last_name'] ?? 'Rivera'));
+        $_SESSION['is_admin'] = ($user['role'] === 'Admin');
         $_SESSION['logged_in'] = true;
         
         session_regenerate_id(true);
@@ -229,5 +229,40 @@ function logLoginAttempt($conn, $username, $success, $reason = null) {
     } catch (Exception $e) {
         error_log("Log Attempt Error: " . $e->getMessage());
     }
+}
+
+function isAdmin() {
+    return isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin';
+}
+
+function isHRManager() {
+    return isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'HR Manager';
+}
+
+function requireAdmin() {
+    if (!isAdmin()) {
+        header('Location: dashboard.php');
+        exit;
+    }
+}
+
+function canEdit() {
+    return isAdmin();
+}
+
+function canManageEmployees() {
+    return isAdmin() || isHRManager();
+}
+
+function canManageLeaves() {
+    return isAdmin() || isHRManager();
+}
+
+function canManageRecruitment() {
+    return isAdmin() || isHRManager();
+}
+
+function canViewLogs() {
+    return isAdmin();
 }
 ?>

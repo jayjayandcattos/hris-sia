@@ -1,11 +1,18 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
-require_once 'config/database.php';
+require_once '../config/database.php';
+require_once '../includes/auth.php';
+
+// Restrict access to Admin only
+if (!canViewLogs()) {
+    header('Location: dashboard.php');
+    exit;
+}
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -86,7 +93,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HRIS - System Logs</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
@@ -181,7 +188,7 @@ try {
     <div class="min-h-screen lg:ml-64">
         <header class="header-gradient text-white p-4 lg:p-6 shadow-xl no-print">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
-                <?php include 'includes/sidebar.php'; ?>
+                <?php include '../includes/sidebar.php'; ?>
                 <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">
                     <i class="fas fa-file-alt mr-2"></i>System Logs
                 </h1>
@@ -363,7 +370,7 @@ try {
                             class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
                         Cancel
                     </button>
-                    <a href="logout.php" 
+                    <a href="../logout.php" 
                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
                         Logout
                     </a>
