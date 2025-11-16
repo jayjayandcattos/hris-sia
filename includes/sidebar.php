@@ -18,6 +18,7 @@ if (!isset($auth_included)) {
         left: 12px;
         transform: translateY(-50%);
         will-change: opacity, visibility;
+        margin-left: -10px;
     }
 
     #mobile-menu-btn.hidden {

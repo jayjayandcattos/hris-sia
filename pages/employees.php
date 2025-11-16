@@ -195,13 +195,13 @@ if ($search) {
 }
 
 if ($position_filter) {
-    $sql .= " AND p.position_title LIKE ?";
-    $params[] = "%$position_filter%";
+    $sql .= " AND p.position_title = ?";
+    $params[] = $position_filter;
 }
 
 if ($department_filter) {
-    $sql .= " AND d.department_name LIKE ?";
-    $params[] = "%$department_filter%";
+    $sql .= " AND d.department_name = ?";
+    $params[] = $department_filter;
 }
 
 $sql .= " ORDER BY e.employee_id DESC";
@@ -425,12 +425,26 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                     <input type="text" name="search" id="searchInput" value="<?php echo htmlspecialchars($search); ?>"
                         placeholder="Search Name or Email"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
-                    <input type="text" name="position" value="<?php echo htmlspecialchars($position_filter); ?>"
-                        placeholder="Filter by Position"
+                    <select name="position" onchange="this.form.submit()"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
-                    <input type="text" name="department" value="<?php echo htmlspecialchars($department_filter); ?>"
-                        placeholder="Filter by Department"
+                        <option value="">All Positions</option>
+                        <?php foreach ($positions as $pos): ?>
+                            <option value="<?php echo htmlspecialchars($pos['position_title']); ?>" 
+                                <?php echo $position_filter === $pos['position_title'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($pos['position_title']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <select name="department" onchange="this.form.submit()"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
+                        <option value="">All Departments</option>
+                        <?php foreach ($departments as $dept): ?>
+                            <option value="<?php echo htmlspecialchars($dept['department_name']); ?>" 
+                                <?php echo $department_filter === $dept['department_name'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($dept['department_name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                     <div class="flex gap-2">
                         <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200">
                             <i class="fas fa-search mr-2"></i>Search
@@ -558,7 +572,7 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
         <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div class="p-6">
                 <h3 id="modalTitle" class="text-xl font-bold text-gray-800 mb-4">Add Employee</h3>
-                <form id="employeeForm" method="POST">
+                <form id="employeeForm" method="POST" onsubmit="return handleEmployeeFormSubmit(event)">
                     <input type="hidden" name="action" id="formAction" value="add">
                     <input type="hidden" name="employee_id" id="employeeId">
 
@@ -593,8 +607,9 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1">Contact Number</label>
-                            <input type="text" name="contact_number" id="contactNumber"
-                                class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500">
+                            <input type="tel" name="contact_number" id="contactNumber" pattern="[0-9]*"
+                                class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                                onkeypress="return event.charCode >= 48 && event.charCode <= 57">
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1">Email</label>
@@ -727,10 +742,39 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                     }
                 }, 500);
             });
+
+            // Contact number validation - numbers only
+            const contactNumberInput = document.getElementById('contactNumber');
+            if (contactNumberInput) {
+                contactNumberInput.addEventListener('input', function(e) {
+                    this.value = this.value.replace(/[^0-9]/g, '');
+                });
+                contactNumberInput.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const paste = (e.clipboardData || window.clipboardData).getData('text');
+                    this.value = paste.replace(/[^0-9]/g, '');
+                });
+            }
         });
 
         function clearFilters() {
             window.location.href = 'employees.php?view=<?php echo $view; ?>';
+        }
+
+        function handleEmployeeFormSubmit(event) {
+            event.preventDefault();
+            const action = document.getElementById('formAction').value;
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
+            const actionText = action === 'add' ? 'add' : 'update';
+            
+            showConfirmModal(
+                `Are you sure you want to ${actionText} employee ${firstName} ${lastName}?`,
+                function() {
+                    document.getElementById('employeeForm').submit();
+                }
+            );
+            return false;
         }
 
         function openAddModal() {

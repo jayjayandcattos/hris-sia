@@ -339,6 +339,7 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
                         <input type="date" id="eventStart" required
+                            min="<?php echo date('Y-m-d'); ?>"
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                     </div>
                     <div class="flex gap-3">
@@ -380,6 +381,7 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
                     <div class="mb-6">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
                         <input type="date" id="editEventStart" required
+                            min="<?php echo date('Y-m-d'); ?>"
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                     </div>
                     <div class="flex gap-3">
@@ -629,30 +631,38 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
         async function submitEvent(e) {
             e.preventDefault();
 
-            const formData = new FormData();
-            formData.append('action', 'add_event');
-            formData.append('event_name', document.getElementById('eventName').value);
-            formData.append('department_id', document.getElementById('eventDepartment').value);
-            formData.append('event_start', document.getElementById('eventStart').value);
+            const eventName = document.getElementById('eventName').value;
+            const eventDate = document.getElementById('eventStart').value;
 
-            try {
-                const response = await fetch('calendar.php', {
-                    method: 'POST',
-                    body: formData
-                });
+            showConfirmModal(
+                `Are you sure you want to add event "${eventName}" on ${eventDate}?`,
+                async function() {
+                    const formData = new FormData();
+                    formData.append('action', 'add_event');
+                    formData.append('event_name', eventName);
+                    formData.append('department_id', document.getElementById('eventDepartment').value);
+                    formData.append('event_start', eventDate);
 
-                const result = await response.json();
+                    try {
+                        const response = await fetch('calendar.php', {
+                            method: 'POST',
+                            body: formData
+                        });
 
-                if (result.success) {
-                    closeAddEventModal();
-                    showSuccess('Event has been added successfully.');
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showAlertModal('Error: ' + result.message, 'error');
+                        const result = await response.json();
+
+                        if (result.success) {
+                            closeAddEventModal();
+                            showSuccess('Event has been added successfully.');
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            showAlertModal('Error: ' + result.message, 'error');
+                        }
+                    } catch (error) {
+                        showAlertModal('Error adding event: ' + error.message, 'error');
+                    }
                 }
-            } catch (error) {
-                showAlertModal('Error adding event: ' + error.message, 'error');
-            }
+            );
         }
 
         function openEditEventModal(eventId) {
@@ -672,31 +682,40 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
         async function updateEvent(e) {
             e.preventDefault();
 
-            const formData = new FormData();
-            formData.append('action', 'update_event');
-            formData.append('event_id', document.getElementById('editEventId').value);
-            formData.append('event_name', document.getElementById('editEventName').value);
-            formData.append('department_id', document.getElementById('editEventDepartment').value);
-            formData.append('event_start', document.getElementById('editEventStart').value);
+            const eventId = document.getElementById('editEventId').value;
+            const eventName = document.getElementById('editEventName').value;
+            const eventDate = document.getElementById('editEventStart').value;
 
-            try {
-                const response = await fetch('calendar.php', {
-                    method: 'POST',
-                    body: formData
-                });
+            showConfirmModal(
+                `Are you sure you want to update event "${eventName}" to ${eventDate}?`,
+                async function() {
+                    const formData = new FormData();
+                    formData.append('action', 'update_event');
+                    formData.append('event_id', eventId);
+                    formData.append('event_name', eventName);
+                    formData.append('department_id', document.getElementById('editEventDepartment').value);
+                    formData.append('event_start', eventDate);
 
-                const result = await response.json();
+                    try {
+                        const response = await fetch('calendar.php', {
+                            method: 'POST',
+                            body: formData
+                        });
 
-                if (result.success) {
-                    closeEditEventModal();
-                    showSuccess('Event has been updated successfully.');
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showAlertModal('Error: ' + result.message, 'error');
+                        const result = await response.json();
+
+                        if (result.success) {
+                            closeEditEventModal();
+                            showSuccess('Event has been updated successfully.');
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            showAlertModal('Error: ' + result.message, 'error');
+                        }
+                    } catch (error) {
+                        showAlertModal('Error updating event: ' + error.message, 'error');
+                    }
                 }
-            } catch (error) {
-                showAlertModal('Error updating event: ' + error.message, 'error');
-            }
+            );
         }
 
         async function deleteEvent() {

@@ -2,6 +2,8 @@
 // Replaces alert() and confirm() with uniform modals
 
 let confirmCallback = null;
+let isAlertModalActive = false;
+let isConfirmModalActive = false;
 
 function showAlertModal(message, type = 'info') {
     const modal = document.getElementById('alertModal');
@@ -14,6 +16,17 @@ function showAlertModal(message, type = 'info') {
         return;
     }
     
+    // Prevent duplicate modals - check both flag and actual DOM state
+    if (isAlertModalActive && modal.classList.contains('active')) {
+        return;
+    }
+    
+    // Reset flag if modal is not actually active (in case of inconsistent state)
+    if (!modal.classList.contains('active')) {
+        isAlertModalActive = false;
+    }
+    
+    isAlertModalActive = true;
     modalMessage.textContent = message;
     
     // Set header color based on type
@@ -43,6 +56,7 @@ function closeAlertModal() {
     if (modal) {
         modal.classList.remove('active');
         document.body.style.overflow = 'auto';
+        isAlertModalActive = false;
     }
 }
 
@@ -55,6 +69,17 @@ function showConfirmModal(message, onConfirm, onCancel = null) {
         return;
     }
     
+    // Prevent duplicate modals - check both flag and actual DOM state
+    if (isConfirmModalActive && modal.classList.contains('active')) {
+        return;
+    }
+    
+    // Reset flag if modal is not actually active (in case of inconsistent state)
+    if (!modal.classList.contains('active')) {
+        isConfirmModalActive = false;
+    }
+    
+    isConfirmModalActive = true;
     modalMessage.textContent = message;
     confirmCallback = onConfirm;
     
@@ -77,6 +102,7 @@ function closeConfirmModal() {
         modal.classList.remove('active');
         document.body.style.overflow = 'auto';
         confirmCallback = null;
+        isConfirmModalActive = false;
         if (window.confirmCancelCallback) {
             delete window.confirmCancelCallback;
         }

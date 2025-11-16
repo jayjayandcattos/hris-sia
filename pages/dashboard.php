@@ -22,8 +22,6 @@ function getCount($conn, $table, $whereClause = '') {
 }
 
 function getMonthlyData($conn, $table, $dateField) {
-    // Handle special case for applicant table which doesn't have a created_at field
-    // We'll use the recruitment date_posted through a join
     if ($table === 'applicant' && $dateField === 'created_at') {
         try {
             $sql = "SELECT DATE_FORMAT(r.date_posted, '%b') as month, COUNT(*) as count 

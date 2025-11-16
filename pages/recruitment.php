@@ -21,15 +21,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     exit;
                 }
                 try {
+                    // Validate required fields
+                    if (empty($_POST['full_name']) || empty($_POST['email']) || empty($_POST['contact_number']) || empty($_POST['recruitment_id'])) {
+                        throw new Exception("Please fill in all required fields.");
+                    }
+
+                    $position_id = $_POST['recruitment_id'];
+                    
+                    // Get position title
+                    $position = fetchOne($conn, "SELECT position_title FROM position WHERE position_id = ?", [$position_id]);
+                    if (!$position) {
+                        throw new Exception("Invalid position selected.");
+                    }
+                    
+                    // Get or create recruitment record
+                    $recruitment = fetchOne($conn, "SELECT recruitment_id FROM recruitment WHERE job_title = ? AND LOWER(status) = 'open' LIMIT 1", [$position['position_title']]);
+                    
+                    if ($recruitment) {
+                        $recruitment_id = $recruitment['recruitment_id'];
+                    } else {
+                        // Create recruitment record
+                        $defaultDept = fetchOne($conn, "SELECT department_id FROM department LIMIT 1");
+                        $deptId = $defaultDept ? $defaultDept['department_id'] : null;
+                        
+                        $insertRecruitmentSql = "INSERT INTO recruitment (job_title, department_id, date_posted, status, posted_by) 
+                                                 VALUES (?, ?, CURDATE(), 'open', ?)";
+                        $insertRecruitmentStmt = $conn->prepare($insertRecruitmentSql);
+                        $insertRecruitmentStmt->execute([
+                            $position['position_title'],
+                            $deptId,
+                            $_SESSION['employee_id'] ?? 1
+                        ]);
+                        $recruitment_id = $conn->lastInsertId();
+                    }
+                    
                     // Insert applicant
+                    $status = !empty($_POST['interview_date']) ? 'To Interview' : 'Pending';
+                    
                     $sql = "INSERT INTO applicant (recruitment_id, full_name, email, contact_number, 
                             resume_file, application_status) 
                             VALUES (?, ?, ?, ?, ?, ?)";
 
-                    $status = !empty($_POST['interview_date']) ? 'To Interview' : 'Pending';
-
                     $params = [
-                        $_POST['recruitment_id'] ?: null,
+                        $recruitment_id,
                         $_POST['full_name'],
                         $_POST['email'],
                         $_POST['contact_number'],
@@ -85,15 +119,91 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $success = $stmt->execute([$_POST['status'], $_POST['applicant_id']]);
 
                     if ($success) {
-                        if (isset($logger)) {
+                        // If status is "Hired", automatically create employee record
+                        if ($_POST['status'] === 'Hired') {
+                            // Fetch applicant data
+                            $applicant = fetchOne($conn, 
+                                "SELECT a.*, r.department_id, r.job_title 
+                                 FROM applicant a 
+                                 LEFT JOIN recruitment r ON a.recruitment_id = r.recruitment_id 
+                                 WHERE a.applicant_id = ?", 
+                                [$_POST['applicant_id']]
+                            );
+
+                            if ($applicant) {
+                                // Split full_name into first_name, last_name, and middle_name
+                                $nameParts = explode(' ', trim($applicant['full_name']));
+                                $firstName = $nameParts[0] ?? '';
+                                $lastName = end($nameParts) ?? '';
+                                $middleName = '';
+                                
+                                // If there are more than 2 parts, middle name is everything in between
+                                if (count($nameParts) > 2) {
+                                    $middleName = implode(' ', array_slice($nameParts, 1, -1));
+                                }
+
+                                // Find position_id from job_title
+                                $position_id = null;
+                                if (!empty($applicant['job_title'])) {
+                                    $position = fetchOne($conn, 
+                                        "SELECT position_id FROM position WHERE position_title = ? LIMIT 1", 
+                                        [$applicant['job_title']]
+                                    );
+                                    if ($position) {
+                                        $position_id = $position['position_id'];
+                                    }
+                                }
+
+                                // Create employee record
+                                $employeeSql = "INSERT INTO employee (first_name, last_name, middle_name, 
+                                        contact_number, email, hire_date, department_id, position_id, employment_status) 
+                                        VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, 'Active')";
+                                
+                                $employeeParams = [
+                                    $firstName,
+                                    $lastName,
+                                    $middleName ?: null,
+                                    $applicant['contact_number'],
+                                    $applicant['email'],
+                                    $applicant['department_id'] ?: null,
+                                    $position_id
+                                ];
+
+                                $employeeStmt = $conn->prepare($employeeSql);
+                                $employeeSuccess = $employeeStmt->execute($employeeParams);
+
+                                if ($employeeSuccess) {
+                                    $message = "Status updated successfully! Employee record created automatically.";
+                                    if (isset($logger)) {
+                                        $logger->info(
+                                            'RECRUITMENT',
+                                            'Applicant hired and employee created',
+                                            "Applicant ID: {$_POST['applicant_id']}, Employee ID: " . $conn->lastInsertId()
+                                        );
+                                    }
+                                } else {
+                                    $message = "Status updated successfully, but failed to create employee record.";
+                                    $messageType = "warning";
+                                }
+                            } else {
+                                $message = "Status updated successfully, but applicant data not found for employee creation.";
+                                $messageType = "warning";
+                            }
+                        } else {
+                            $message = "Status updated successfully!";
+                        }
+
+                        if (!isset($messageType) || $messageType !== "warning") {
+                            $messageType = "success";
+                        }
+
+                        if (isset($logger) && $_POST['status'] !== 'Hired') {
                             $logger->info(
                                 'RECRUITMENT',
                                 'Applicant status updated',
                                 "ID: {$_POST['applicant_id']}, Status: {$_POST['status']}"
                             );
                         }
-                        $message = "Status updated successfully!";
-                        $messageType = "success";
                     }
                 } catch (Exception $e) {
                     if (isset($logger)) {
@@ -318,8 +428,11 @@ $archived_count = (int)($archivedStats['archived'] ?? 0);
 $recruitments = fetchAll($conn, "SELECT r.*, d.department_name 
                                  FROM recruitment r 
                                  LEFT JOIN department d ON r.department_id = d.department_id 
-                                 WHERE r.status = 'Open' 
+                                 WHERE LOWER(r.status) = 'open' 
                                  ORDER BY r.date_posted DESC");
+
+// Fetch positions from position table (same as employee.php)
+$positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
 
 // If no recruitment positions exist, show message
 $noRecruitments = empty($recruitments);
@@ -728,7 +841,7 @@ class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div class="p-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">Add Applicant</h3>
-                <form method="POST">
+                <form method="POST" onsubmit="return handleAddApplicantSubmit(event)">
                     <input type="hidden" name="action" value="add">
                     <div class="space-y-4">
                         <div>
@@ -743,16 +856,17 @@ class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1">Contact Number *</label>
-                            <input type="text" name="contact_number" required
-                                class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500">
+                            <input type="tel" name="contact_number" id="contactNumber" pattern="[0-9]*" required
+                                class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                                onkeypress="return event.charCode >= 48 && event.charCode <= 57">
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1">Position *</label>
                             <select name="recruitment_id" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500">
                                 <option value="">Select Position</option>
-                                <?php foreach ($recruitments as $rec): ?>
-                                    <option value="<?php echo $rec['recruitment_id']; ?>">
-                                        <?php echo htmlspecialchars($rec['job_title'] . ' - ' . ($rec['department_name'] ?? 'No Dept')); ?>
+                                <?php foreach ($positions as $pos): ?>
+                                    <option value="<?php echo $pos['position_id']; ?>">
+                                        <?php echo htmlspecialchars($pos['position_title']); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -801,7 +915,7 @@ class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div class="p-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">Update Status</h3>
-                <form method="POST">
+                <form method="POST" onsubmit="return handleUpdateApplicantSubmit(event)">
                     <input type="hidden" name="action" value="update_status">
                     <input type="hidden" name="applicant_id" id="updateApplicantId">
                     <div class="mb-4">
@@ -998,6 +1112,42 @@ class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm
             document.getElementById('deleteModal').classList.add('hidden');
         }
 
+        function handleAddApplicantSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const fullName = form.querySelector('input[name="full_name"]').value;
+            
+            if (!fullName || fullName.trim() === '') {
+                showAlertModal('Please enter a full name', 'error');
+                return false;
+            }
+            
+            showConfirmModal(
+                `Are you sure you want to add applicant ${fullName}?`,
+                function() {
+                    // Remove the onsubmit handler temporarily to allow form submission
+                    form.onsubmit = null;
+                    form.submit();
+                }
+            );
+            return false;
+        }
+
+        function handleUpdateApplicantSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const applicantId = form.querySelector('input[name="applicant_id"]').value;
+            const newStatus = form.querySelector('select[name="status"]').value;
+            
+            showConfirmModal(
+                `Are you sure you want to update applicant #${applicantId} status to "${newStatus}"?`,
+                function() {
+                    form.submit();
+                }
+            );
+            return false;
+        }
+
         function openLogoutModal() {
             document.getElementById('logoutModal').classList.add('active');
         }
@@ -1019,6 +1169,25 @@ class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm
         });
     </script>
 
+    <script src="../js/modal.js"></script>
+
+    <script>
+        // Contact number validation (same as employees.php)
+        document.addEventListener('DOMContentLoaded', function() {
+            const contactNumberInput = document.getElementById('contactNumber');
+            if (contactNumberInput) {
+                contactNumberInput.addEventListener('input', function(e) {
+                    this.value = this.value.replace(/[^0-9]/g, '');
+                });
+                contactNumberInput.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const paste = (e.clipboardData || window.clipboardData).getData('text');
+                    this.value = paste.replace(/[^0-9]/g, '');
+                });
+            }
+        });
+    </script>
+
     <div id="logoutModal" class="modal">
         <div class="modal-content max-w-md w-full mx-4">
             <div class="bg-red-600 text-white p-4 rounded-t-lg">
@@ -1035,6 +1204,46 @@ class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm
                         class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
                         Logout
                     </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div id="alertModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="modal-header bg-teal-700 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold" id="alertModalTitle">Information</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6" id="alertModalMessage"></p>
+                <div class="flex justify-end">
+                    <button onclick="closeAlertModal()" 
+                            class="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition">
+                        OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="bg-yellow-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Confirm Action</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6" id="confirmModalMessage"></p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="handleCancel()" 
+                            class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                        Cancel
+                    </button>
+                    <button onclick="handleConfirm()" 
+                            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition">
+                        Confirm
+                    </button>
                 </div>
             </div>
         </div>

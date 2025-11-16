@@ -68,10 +68,16 @@ $date_filter = $_GET['date'] ?? date('Y-m-d');
 $position_filter = $_GET['position'] ?? '';
 $department_filter = $_GET['department'] ?? '';
 
-$sql = "SELECT a.*, 
-        e.first_name, e.last_name, e.employee_id as emp_id,
+
+// Query to get attendance records
+$sql = "SELECT a.attendance_id, a.employee_id as emp_id, a.date, a.time_in, a.time_out, a.total_hours, a.status, a.remarks,
+        e.first_name, e.last_name,
         d.department_name, 
-        p.position_title
+        p.position_title,
+        NULL as leave_request_id,
+        NULL as leave_status,
+        NULL as leave_name,
+        'attendance' as record_type
         FROM attendance a
         INNER JOIN employee e ON a.employee_id = e.employee_id
         LEFT JOIN department d ON e.department_id = d.department_id
@@ -90,7 +96,45 @@ if ($department_filter) {
     $params[] = "%$department_filter%";
 }
 
-$sql .= " ORDER BY a.time_in DESC";
+// UNION with employees on approved leave who don't have attendance records
+$sql .= " UNION
+        SELECT NULL as attendance_id, e.employee_id as emp_id, ? as date, NULL as time_in, NULL as time_out, NULL as total_hours, 'Leave' as status, NULL as remarks,
+        e.first_name, e.last_name,
+        d.department_name,
+        p.position_title,
+        lr.leave_request_id,
+        lr.status as leave_status,
+        lt.leave_name,
+        'leave' as record_type
+        FROM employee e
+        INNER JOIN leave_request lr ON e.employee_id = lr.employee_id
+        LEFT JOIN department d ON e.department_id = d.department_id
+        LEFT JOIN position p ON e.position_id = p.position_id
+        LEFT JOIN leave_type lt ON lr.leave_type_id = lt.leave_type_id
+        WHERE e.employment_status = 'Active'
+        AND UPPER(TRIM(lr.status)) = 'APPROVED'
+        AND CAST(? AS DATE) >= CAST(lr.start_date AS DATE)
+        AND CAST(? AS DATE) <= CAST(lr.end_date AS DATE)
+        AND e.employee_id NOT IN (
+            SELECT DISTINCT employee_id FROM attendance WHERE DATE(date) = CAST(? AS DATE)
+        )";
+
+$params[] = $date_filter;
+$params[] = $date_filter;
+$params[] = $date_filter;
+$params[] = $date_filter;
+
+if ($position_filter) {
+    $sql .= " AND p.position_title LIKE ?";
+    $params[] = "%$position_filter%";
+}
+
+if ($department_filter) {
+    $sql .= " AND d.department_name LIKE ?";
+    $params[] = "%$department_filter%";
+}
+
+$sql .= " ORDER BY record_type DESC, time_in DESC";
 
 try {
     $stmt = $conn->prepare($sql);
@@ -100,6 +144,11 @@ try {
     $attendance_records = [];
     $message = "Database Error: " . $e->getMessage();
     $messageType = "error";
+    // Log error for debugging
+    error_log("Attendance query error: " . $e->getMessage());
+    if (isset($logger)) {
+        $logger->error('ATTENDANCE', 'Failed to fetch attendance records', $e->getMessage());
+    }
 }
 
 function calculateWorkHours($time_in, $time_out)
@@ -128,12 +177,7 @@ $present = 0;
 $absent = 0;
 $leave = 0;
 
-foreach ($attendance_records as $record) {
-    if ($record['status'] === 'Present') $present++;
-    elseif ($record['status'] === 'Absent') $absent++;
-    elseif ($record['status'] === 'Leave') $leave++;
-}
-
+// Get all active employees
 $totalEmployees = 0;
 try {
     $empSql = "SELECT COUNT(*) as total FROM employee WHERE employment_status = 'Active'";
@@ -144,8 +188,95 @@ try {
     $totalEmployees = 0;
 }
 
-if ($date_filter == date('Y-m-d')) {
-    $absent = $totalEmployees - count($attendance_records);
+// Get employees with attendance records for the date
+$employeesWithAttendance = [];
+foreach ($attendance_records as $record) {
+    if ($record['record_type'] === 'attendance') {
+        $employeesWithAttendance[] = $record['emp_id'];
+        if ($record['status'] === 'Present') $present++;
+        elseif ($record['status'] === 'Absent') $absent++;
+    }
+}
+
+// Get employees on approved leave for the date (detailed information for modal)
+$employeesOnLeave = [];
+$employeesOnLeaveDetails = [];
+try {
+    $leaveSql = "SELECT DISTINCT e.employee_id 
+                 FROM employee e
+                 INNER JOIN leave_request lr ON e.employee_id = lr.employee_id
+                 WHERE e.employment_status = 'Active'
+                 AND UPPER(TRIM(lr.status)) = 'APPROVED'
+                 AND CAST(? AS DATE) >= CAST(lr.start_date AS DATE)
+                 AND CAST(? AS DATE) <= CAST(lr.end_date AS DATE)";
+    $leaveStmt = $conn->prepare($leaveSql);
+    $leaveStmt->execute([$date_filter, $date_filter]);
+    $leaveEmployees = $leaveStmt->fetchAll(PDO::FETCH_COLUMN);
+    $employeesOnLeave = $leaveEmployees;
+    $leave = count($employeesOnLeave);
+    
+    // Get detailed leave information for modal
+    if (count($employeesOnLeave) > 0) {
+        $leaveDetailsSql = "SELECT e.employee_id, e.first_name, e.last_name,
+                           d.department_name, p.position_title,
+                           lr.leave_request_id, lr.start_date, lr.end_date, lr.total_days, lr.reason,
+                           lt.leave_name
+                           FROM employee e
+                           INNER JOIN leave_request lr ON e.employee_id = lr.employee_id
+                           LEFT JOIN department d ON e.department_id = d.department_id
+                           LEFT JOIN position p ON e.position_id = p.position_id
+                           LEFT JOIN leave_type lt ON lr.leave_type_id = lt.leave_type_id
+                           WHERE e.employment_status = 'Active'
+                           AND UPPER(TRIM(lr.status)) = 'APPROVED'
+                           AND CAST(? AS DATE) >= CAST(lr.start_date AS DATE)
+                           AND CAST(? AS DATE) <= CAST(lr.end_date AS DATE)
+                           ORDER BY e.first_name, e.last_name";
+        $leaveDetailsStmt = $conn->prepare($leaveDetailsSql);
+        $leaveDetailsStmt->execute([$date_filter, $date_filter]);
+        $employeesOnLeaveDetails = $leaveDetailsStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+} catch (Exception $e) {
+    $employeesOnLeave = [];
+    $employeesOnLeaveDetails = [];
+    // Log error for debugging
+    error_log("Error fetching leave employees: " . $e->getMessage());
+    if (isset($logger)) {
+        $logger->error('ATTENDANCE', 'Failed to fetch leave employees', $e->getMessage());
+    }
+}
+
+// Calculate absent: total employees - present - on leave
+// Absent = employees without attendance record and not on leave
+$employeesPresentIds = array_unique($employeesWithAttendance);
+$absent = $totalEmployees - count($employeesPresentIds) - count($employeesOnLeave);
+
+// Ensure absent is not negative
+if ($absent < 0) $absent = 0;
+
+// Get list of absent employees (not present and not on leave)
+$absentEmployees = [];
+try {
+    $absentSql = "SELECT e.employee_id, e.first_name, e.last_name, 
+                         d.department_name, p.position_title
+                  FROM employee e
+                  LEFT JOIN department d ON e.department_id = d.department_id
+                  LEFT JOIN position p ON e.position_id = p.position_id
+                  WHERE e.employment_status = 'Active'
+                  AND e.employee_id NOT IN (
+                      SELECT DISTINCT employee_id FROM attendance WHERE DATE(date) = ?
+                  )
+                  AND e.employee_id NOT IN (
+                      SELECT DISTINCT lr.employee_id 
+                      FROM leave_request lr
+                      WHERE UPPER(TRIM(lr.status)) = 'APPROVED'
+                      AND CAST(? AS DATE) >= CAST(lr.start_date AS DATE)
+                      AND CAST(? AS DATE) <= CAST(lr.end_date AS DATE)
+                  )";
+    $absentStmt = $conn->prepare($absentSql);
+    $absentStmt->execute([$date_filter, $date_filter, $date_filter]);
+    $absentEmployees = $absentStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $absentEmployees = [];
 }
 ?>
 <!DOCTYPE html>
@@ -340,11 +471,39 @@ if ($date_filter == date('Y-m-d')) {
                 </div>
             <?php endif; ?>
 
-            <?php if (empty($attendance_records)): ?>
+            <?php if (isset($_GET['debug']) && $_GET['debug'] == '1'): ?>
+                <div class="mb-4 p-4 rounded-lg bg-blue-100 text-blue-800 text-sm">
+                    <strong>🔍 DEBUG INFO:</strong><br>
+                    Date Filter: <strong><?php echo htmlspecialchars($date_filter); ?></strong><br>
+                    Total Records: <?php echo count($attendance_records); ?><br>
+                    Leave Count: <strong><?php echo $leave; ?></strong><br>
+                    Employees on Leave IDs: <?php echo empty($employeesOnLeave) ? 'NONE' : implode(', ', $employeesOnLeave); ?>
+                </div>
+            <?php endif; ?>
+            
+            <?php 
+            $hasAttendanceRecords = false;
+            $hasLeaveRecords = false;
+            foreach ($attendance_records as $record) {
+                if ($record['record_type'] === 'attendance') {
+                    $hasAttendanceRecords = true;
+                }
+                if ($record['record_type'] === 'leave') {
+                    $hasLeaveRecords = true;
+                }
+            }
+            ?>
+            <?php if (!$hasAttendanceRecords && !$hasLeaveRecords): ?>
                 <div class="mb-4 p-4 rounded-lg bg-yellow-100 text-yellow-800">
                     <strong>No attendance records found for <?php echo htmlspecialchars($date_filter); ?></strong>
                     <br>
                     <small>Employees need to time-in from the main login page first.</small>
+                </div>
+            <?php elseif (!$hasAttendanceRecords && $hasLeaveRecords): ?>
+                <div class="mb-4 p-4 rounded-lg bg-blue-100 text-blue-800">
+                    <strong>No attendance records for <?php echo htmlspecialchars($date_filter); ?></strong>
+                    <br>
+                    <small>However, <?php echo $leave; ?> employee(s) are on approved leave for this date.</small>
                 </div>
             <?php endif; ?>
 
@@ -356,14 +515,14 @@ if ($date_filter == date('Y-m-d')) {
                     <h3 class="text-xs sm:text-sm font-semibold mb-2">Present</h3>
                     <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $present; ?></p>
                 </div>
-                <div class="stat-card absent-card text-white rounded-xl p-5 lg:p-6 shadow-xl">
+                <div class="stat-card absent-card text-white rounded-xl p-5 lg:p-6 shadow-xl" onclick="showAbsentEmployees()" style="cursor: pointer;">
                     <div class="stat-icon">
                         <i class="fas fa-times-circle text-2xl"></i>
                     </div>
                     <h3 class="text-xs sm:text-sm font-semibold mb-2">Absent</h3>
                     <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $absent; ?></p>
                 </div>
-                <div class="stat-card leave-card text-white rounded-xl p-5 lg:p-6 shadow-xl">
+                <div class="stat-card leave-card text-white rounded-xl p-5 lg:p-6 shadow-xl" onclick="showLeaveEmployees()" style="cursor: pointer;">
                     <div class="stat-icon">
                         <i class="fas fa-calendar-times text-2xl"></i>
                     </div>
@@ -399,7 +558,7 @@ if ($date_filter == date('Y-m-d')) {
                     </div>
                 </form>
 
-                <?php if (!empty($attendance_records)): ?>
+                <?php if (!empty($attendance_records) || $hasLeaveRecords): ?>
                     <div class="overflow-x-auto">
                         <table class="desktop-table w-full">
                             <thead>
@@ -418,20 +577,41 @@ if ($date_filter == date('Y-m-d')) {
                                 <?php foreach ($attendance_records as $record): ?>
                                     <tr class="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                                         data-status="<?php echo htmlspecialchars($record['status']); ?>"
-                                        data-time-in="<?php echo htmlspecialchars($record['time_in']); ?>"
+                                        data-time-in="<?php echo htmlspecialchars($record['time_in'] ?? ''); ?>"
                                         data-time-out="<?php echo htmlspecialchars($record['time_out'] ?? ''); ?>"
-                                        data-attendance-id="<?php echo htmlspecialchars($record['attendance_id']); ?>">
+                                        data-attendance-id="<?php echo htmlspecialchars($record['attendance_id'] ?? ''); ?>">
                                         <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['emp_id']); ?></td>
                                         <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['first_name'] . ' ' . $record['last_name']); ?></td>
                                         <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['position_title'] ?? 'N/A'); ?></td>
                                         <td class="px-3 py-2 text-sm text-gray-800"><?php echo htmlspecialchars($record['department_name'] ?? 'N/A'); ?></td>
-                                        <td class="px-3 py-2 text-sm text-gray-800"><?php echo date('h:i A', strtotime($record['time_in'])); ?></td>
-                                        <td class="px-3 py-2 text-sm text-gray-800"><?php echo $record['time_out'] ? date('h:i A', strtotime($record['time_out'])) : '-'; ?></td>
-                                        <td class="px-3 py-2 text-sm text-gray-800 work-duration" data-live="<?php echo !$record['time_out'] ? '1' : '0'; ?>">
-                                            <?php echo calculateWorkHours($record['time_in'], $record['time_out']); ?>
+                                        <td class="px-3 py-2 text-sm text-gray-800">
+                                            <?php if ($record['record_type'] === 'leave'): ?>
+                                                <span class="text-blue-600 font-medium">On Leave</span>
+                                                <?php if (!empty($record['leave_name'])): ?>
+                                                    <br><span class="text-xs text-gray-500"><?php echo htmlspecialchars($record['leave_name']); ?></span>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <?php echo $record['time_in'] ? date('h:i A', strtotime($record['time_in'])) : '-'; ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="px-3 py-2 text-sm text-gray-800">
+                                            <?php if ($record['record_type'] === 'leave'): ?>
+                                                <span class="text-gray-500">-</span>
+                                            <?php else: ?>
+                                                <?php echo $record['time_out'] ? date('h:i A', strtotime($record['time_out'])) : '-'; ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="px-3 py-2 text-sm text-gray-800 work-duration" data-live="<?php echo ($record['record_type'] === 'attendance' && !$record['time_out']) ? '1' : '0'; ?>">
+                                            <?php if ($record['record_type'] === 'leave'): ?>
+                                                <span class="text-blue-600">-</span>
+                                            <?php else: ?>
+                                                <?php echo calculateWorkHours($record['time_in'], $record['time_out']); ?>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="px-3 py-2">
-                                            <?php if (!$record['time_out']): ?>
+                                            <?php if ($record['record_type'] === 'leave'): ?>
+                                                <span class="text-blue-600 text-xs font-medium">On Leave</span>
+                                            <?php elseif (!$record['time_out']): ?>
                                                 <button type="button" onclick="showConfirmTimeOut(<?php echo htmlspecialchars($record['attendance_id']); ?>)" 
                                                         class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200">
                                                     <i class="fas fa-sign-out-alt mr-1"></i>Time Out
@@ -452,7 +632,7 @@ if ($date_filter == date('Y-m-d')) {
                                 data-position="<?php echo strtolower($record['position_title'] ?? ''); ?>"
                                 data-department="<?php echo strtolower($record['department_name'] ?? ''); ?>"
                                 data-status="<?php echo htmlspecialchars($record['status']); ?>"
-                                data-time-in="<?php echo htmlspecialchars($record['time_in']); ?>"
+                                data-time-in="<?php echo htmlspecialchars($record['time_in'] ?? ''); ?>"
                                 data-time-out="<?php echo htmlspecialchars($record['time_out'] ?? ''); ?>">
                                 <div class="flex justify-between items-start mb-3">
                                     <div>
@@ -463,6 +643,7 @@ if ($date_filter == date('Y-m-d')) {
                                     <?php
                                     if ($record['status'] === 'Present') echo 'bg-green-100 text-green-800';
                                     elseif ($record['status'] === 'Absent') echo 'bg-red-100 text-red-800';
+                                    elseif ($record['status'] === 'Leave') echo 'bg-blue-100 text-blue-800';
                                     else echo 'bg-yellow-100 text-yellow-800';
                                     ?>">
                                         <?php echo htmlspecialchars($record['status']); ?>
@@ -478,23 +659,36 @@ if ($date_filter == date('Y-m-d')) {
                                         <span class="text-gray-500 w-28 text-xs">Department:</span>
                                         <span class="text-gray-900"><?php echo htmlspecialchars($record['department_name'] ?? 'N/A'); ?></span>
                                     </div>
-                                    <div class="flex items-center text-sm">
-                                        <span class="text-gray-500 w-28 text-xs">Time-In:</span>
-                                        <span class="text-gray-900"><?php echo date('h:i A', strtotime($record['time_in'])); ?></span>
-                                    </div>
-                                    <div class="flex items-center text-sm">
-                                        <span class="text-gray-500 w-28 text-xs">Time-Out:</span>
-                                        <span class="text-gray-900"><?php echo $record['time_out'] ? date('h:i A', strtotime($record['time_out'])) : '-'; ?></span>
-                                    </div>
-                                    <div class="flex items-center text-sm">
-                                        <span class="text-gray-500 w-28 text-xs">Work Duration:</span>
-                                        <span class="text-gray-900 work-duration" data-live="<?php echo !$record['time_out'] ? '1' : '0'; ?>">
-                                            <?php echo calculateWorkHours($record['time_in'], $record['time_out']); ?>
-                                        </span>
-                                    </div>
+                                    <?php if ($record['record_type'] === 'leave'): ?>
+                                        <div class="flex items-center text-sm">
+                                            <span class="text-gray-500 w-28 text-xs">Leave Type:</span>
+                                            <span class="text-blue-600 font-medium"><?php echo htmlspecialchars($record['leave_name'] ?? 'N/A'); ?></span>
+                                        </div>
+                                        <div class="flex items-center text-sm">
+                                            <span class="text-gray-500 w-28 text-xs">Status:</span>
+                                            <span class="text-blue-600 font-medium">On Leave</span>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="flex items-center text-sm">
+                                            <span class="text-gray-500 w-28 text-xs">Time-In:</span>
+                                            <span class="text-gray-900"><?php echo $record['time_in'] ? date('h:i A', strtotime($record['time_in'])) : '-'; ?></span>
+                                        </div>
+                                        <div class="flex items-center text-sm">
+                                            <span class="text-gray-500 w-28 text-xs">Time-Out:</span>
+                                            <span class="text-gray-900"><?php echo $record['time_out'] ? date('h:i A', strtotime($record['time_out'])) : '-'; ?></span>
+                                        </div>
+                                        <div class="flex items-center text-sm">
+                                            <span class="text-gray-500 w-28 text-xs">Work Duration:</span>
+                                            <span class="text-gray-900 work-duration" data-live="<?php echo !$record['time_out'] ? '1' : '0'; ?>">
+                                                <?php echo calculateWorkHours($record['time_in'], $record['time_out']); ?>
+                                            </span>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
 
-                                <?php if (!$record['time_out']): ?>
+                                <?php if ($record['record_type'] === 'leave'): ?>
+                                    <div class="text-center text-blue-600 text-sm font-medium py-2">On Leave</div>
+                                <?php elseif (!$record['time_out']): ?>
                                     <button type="button" onclick="showConfirmTimeOut(<?php echo htmlspecialchars($record['attendance_id']); ?>)" 
                                             class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors">
                                         Time Out
@@ -721,6 +915,84 @@ if ($date_filter == date('Y-m-d')) {
                 }
             );
         }
+
+        function showAbsentEmployees() {
+            const absentEmployees = <?php echo json_encode($absentEmployees); ?>;
+            const dateFilter = '<?php echo htmlspecialchars($date_filter); ?>';
+            
+            if (absentEmployees.length === 0) {
+                showAlertModal('No absent employees for ' + dateFilter, 'info');
+                return;
+            }
+            
+            let listHtml = '<div class="max-h-96 overflow-y-auto"><table class="w-full text-sm"><thead><tr class="bg-gray-100"><th class="px-3 py-2 text-left">ID</th><th class="px-3 py-2 text-left">Name</th><th class="px-3 py-2 text-left">Position</th><th class="px-3 py-2 text-left">Department</th></tr></thead><tbody>';
+            absentEmployees.forEach(emp => {
+                listHtml += `<tr class="border-b"><td class="px-3 py-2">${emp.employee_id}</td><td class="px-3 py-2">${emp.first_name} ${emp.last_name}</td><td class="px-3 py-2">${emp.position_title || 'N/A'}</td><td class="px-3 py-2">${emp.department_name || 'N/A'}</td></tr>`;
+            });
+            listHtml += '</tbody></table></div>';
+            
+            const modal = document.getElementById('absentEmployeesModal');
+            const modalContent = document.getElementById('absentEmployeesList');
+            if (modal && modalContent) {
+                modalContent.innerHTML = listHtml;
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            } else {
+                showAlertModal('Absent Employees for ' + dateFilter + ':\n\n' + absentEmployees.map(e => `${e.first_name} ${e.last_name} (ID: ${e.employee_id})`).join('\n'), 'info');
+            }
+        }
+
+        function showLeaveEmployees() {
+            const leaveEmployees = <?php echo json_encode($employeesOnLeaveDetails); ?>;
+            const dateFilter = '<?php echo htmlspecialchars($date_filter); ?>';
+            
+            if (leaveEmployees.length === 0) {
+                showAlertModal('No employees on leave for ' + dateFilter, 'info');
+                return;
+            }
+            
+            let listHtml = '<div class="max-h-96 overflow-y-auto"><table class="w-full text-sm"><thead><tr class="bg-gray-100"><th class="px-3 py-2 text-left">ID</th><th class="px-3 py-2 text-left">Name</th><th class="px-3 py-2 text-left">Position</th><th class="px-3 py-2 text-left">Department</th><th class="px-3 py-2 text-left">Leave Type</th><th class="px-3 py-2 text-left">Dates</th><th class="px-3 py-2 text-left">Days</th></tr></thead><tbody>';
+            leaveEmployees.forEach(emp => {
+                const startDate = new Date(emp.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const endDate = new Date(emp.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                listHtml += `<tr class="border-b">
+                    <td class="px-3 py-2">${emp.employee_id}</td>
+                    <td class="px-3 py-2">${emp.first_name} ${emp.last_name}</td>
+                    <td class="px-3 py-2">${emp.position_title || 'N/A'}</td>
+                    <td class="px-3 py-2">${emp.department_name || 'N/A'}</td>
+                    <td class="px-3 py-2">${emp.leave_name || 'N/A'}</td>
+                    <td class="px-3 py-2">${startDate} - ${endDate}</td>
+                    <td class="px-3 py-2">${emp.total_days || 'N/A'}</td>
+                </tr>`;
+            });
+            listHtml += '</tbody></table></div>';
+            
+            const modal = document.getElementById('leaveEmployeesModal');
+            const modalContent = document.getElementById('leaveEmployeesList');
+            if (modal && modalContent) {
+                modalContent.innerHTML = listHtml;
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            } else {
+                showAlertModal('Employees on Leave for ' + dateFilter + ':\n\n' + leaveEmployees.map(e => `${e.first_name} ${e.last_name} (ID: ${e.employee_id}) - ${e.leave_name || 'N/A'}`).join('\n'), 'info');
+            }
+        }
+
+        function closeLeaveEmployeesModal() {
+            const modal = document.getElementById('leaveEmployeesModal');
+            if (modal) {
+                modal.classList.remove('active');
+                document.body.style.overflow = 'auto';
+            }
+        }
+
+        function closeAbsentEmployeesModal() {
+            const modal = document.getElementById('absentEmployeesModal');
+            if (modal) {
+                modal.classList.remove('active');
+                document.body.style.overflow = 'auto';
+            }
+        }
     </script>
 
     <!-- Alert Modal -->
@@ -762,6 +1034,75 @@ if ($date_filter == date('Y-m-d')) {
             </div>
         </div>
     </div>
+
+    <!-- Absent Employees Modal -->
+    <div id="absentEmployeesModal" class="modal">
+        <div class="modal-content max-w-3xl w-full mx-4">
+            <div class="bg-red-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Absent Employees - <?php echo htmlspecialchars($date_filter); ?></h2>
+            </div>
+            <div class="p-6" id="absentEmployeesList">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+            <div class="p-4 bg-gray-50 rounded-b-lg">
+                <button onclick="closeAbsentEmployeesModal()" 
+                        class="w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leave Employees Modal -->
+    <div id="leaveEmployeesModal" class="modal">
+        <div class="modal-content max-w-4xl w-full mx-4">
+            <div class="bg-blue-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Employees on Leave - <?php echo htmlspecialchars($date_filter); ?></h2>
+            </div>
+            <div class="p-6" id="leaveEmployeesList">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+            <div class="p-4 bg-gray-50 rounded-b-lg">
+                <button onclick="closeLeaveEmployeesModal()" 
+                        class="w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add event listeners for custom modals
+        document.addEventListener('DOMContentLoaded', function() {
+            // Absent Employees Modal
+            const absentModal = document.getElementById('absentEmployeesModal');
+            if (absentModal) {
+                absentModal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeAbsentEmployeesModal();
+                    }
+                });
+            }
+
+            // Leave Employees Modal
+            const leaveModal = document.getElementById('leaveEmployeesModal');
+            if (leaveModal) {
+                leaveModal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeLeaveEmployeesModal();
+                    }
+                });
+            }
+
+            // Close modals on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeAbsentEmployeesModal();
+                    closeLeaveEmployeesModal();
+                }
+            });
+        });
+    </script>
 
     <script src="../js/modal.js"></script>
 </body>

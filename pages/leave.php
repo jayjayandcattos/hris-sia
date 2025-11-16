@@ -858,6 +858,7 @@ try {
                         <input
                             type="date"
                             name="start_date"
+                            min="<?php echo date('Y-m-d'); ?>"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                             required>
                     </div>
