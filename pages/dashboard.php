@@ -384,7 +384,10 @@ $chartData = [
         <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include '../includes/sidebar.php'; ?>
-                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">Dashboard</h1>
+                <div class="flex items-center gap-3">
+                    <img src="../assets/LOGO.png" alt="Logo" class="h-8 w-8 sm:h-10 sm:w-10 object-contain">
+                    <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">Dashboard</h1>
+                </div>
                 <button onclick="openLogoutModal()" 
                    class="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg font-semibold text-red-600 hover:text-red-700 hover:bg-white transition-all duration-200 text-xs sm:text-sm shadow-lg hover:shadow-xl transform hover:scale-105">
                     <i class="fas fa-sign-out-alt mr-2"></i>Logout
