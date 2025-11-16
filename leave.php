@@ -1,66 +1,304 @@
 <?php
 session_start();
 
-
 if (!isset($_SESSION['user_id'])) {
     header('Location: index.php');
     exit;
 }
 
-// include 'config/database.php';
+require_once 'config/database.php';
 
+$message = '';
+$messageType = '';
+$success_message = '';
 
+// Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (isset($_POST['action'])) {
+        switch ($_POST['action']) {
+            case 'add':
+                try {
+                    $employee_id = $_POST['employee_id'] ?? '';
+                    $leave_type_id = $_POST['leave_type_id'] ?? '';
+                    $start_date = $_POST['start_date'] ?? '';
+                    $end_date = $_POST['end_date'] ?? '';
+                    $reason = $_POST['reason'] ?? '';
 
+                    // Validate inputs
+                    if (empty($employee_id) || empty($leave_type_id) || empty($start_date) || empty($end_date)) {
+                        throw new Exception("All fields are required");
+                    }
+
+                    // Validate dates
+                    if (strtotime($start_date) > strtotime($end_date)) {
+                        throw new Exception("End date must be after start date");
+                    }
+
+                    // Calculate total days (inclusive of start and end dates)
+                    $start = new DateTime($start_date);
+                    $end = new DateTime($end_date);
+                    $interval = $start->diff($end);
+                    $total_days = $interval->days + 1; // +1 to include both start and end dates
+
+                    // Check if employee exists
+                    $empCheck = fetchOne($conn, "SELECT employee_id FROM employee WHERE employee_id = ?", [$employee_id]);
+                    if (!$empCheck) {
+                        throw new Exception("Employee not found");
+                    }
+
+                    // Insert leave request
+                    $sql = "INSERT INTO leave_request (employee_id, leave_type_id, start_date, end_date, total_days, reason, status, date_requested) 
+                            VALUES (?, ?, ?, ?, ?, ?, 'Pending', CURDATE())";
+
+                    $stmt = $conn->prepare($sql);
+                    $success = $stmt->execute([
+                        $employee_id,
+                        $leave_type_id,
+                        $start_date,
+                        $end_date,
+                        $total_days,
+                        $reason
+                    ]);
+
+                    if ($success) {
+                        if (isset($logger)) {
+                            $logger->info(
+                                'LEAVE',
+                                'Leave request created',
+                                "Employee ID: $employee_id, Days: $total_days"
+                            );
+                        }
+                        $success_message = "Leave request submitted successfully!";
+                        $messageType = "success";
+                    } else {
+                        throw new Exception("Failed to submit leave request");
+                    }
+                } catch (Exception $e) {
+                    if (isset($logger)) {
+                        $logger->error('LEAVE', 'Failed to create leave request', $e->getMessage());
+                    }
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = "error";
+                }
+                break;
+
+            case 'approve':
+                try {
+                    $leave_request_id = $_POST['leave_request_id'] ?? '';
+                    $approver_id = $_SESSION['user_id'] ?? null;
+
+                    if (empty($leave_request_id)) {
+                        throw new Exception("Leave request ID is required");
+                    }
+
+                    $sql = "UPDATE leave_request 
+                            SET status = 'Approved', 
+                                approver_id = ?, 
+                                date_approved = CURDATE() 
+                            WHERE leave_request_id = ?";
+
+                    $stmt = $conn->prepare($sql);
+                    $success = $stmt->execute([$approver_id, $leave_request_id]);
+
+                    if ($success) {
+                        if (isset($logger)) {
+                            $logger->info('LEAVE', 'Leave request approved', "Leave Request ID: $leave_request_id");
+                        }
+                        $success_message = "Leave request approved successfully!";
+                        $messageType = "success";
+                    } else {
+                        throw new Exception("Failed to approve leave request");
+                    }
+                } catch (Exception $e) {
+                    if (isset($logger)) {
+                        $logger->error('LEAVE', 'Failed to approve leave request', $e->getMessage());
+                    }
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = "error";
+                }
+                break;
+
+            case 'reject':
+                try {
+                    $leave_request_id = $_POST['leave_request_id'] ?? '';
+                    $approver_id = $_SESSION['user_id'] ?? null;
+
+                    if (empty($leave_request_id)) {
+                        throw new Exception("Leave request ID is required");
+                    }
+
+                    $sql = "UPDATE leave_request 
+                            SET status = 'Rejected', 
+                                approver_id = ?, 
+                                date_approved = CURDATE() 
+                            WHERE leave_request_id = ?";
+
+                    $stmt = $conn->prepare($sql);
+                    $success = $stmt->execute([$approver_id, $leave_request_id]);
+
+                    if ($success) {
+                        if (isset($logger)) {
+                            $logger->info('LEAVE', 'Leave request rejected', "Leave Request ID: $leave_request_id");
+                        }
+                        $success_message = "Leave request rejected successfully!";
+                        $messageType = "success";
+                    } else {
+                        throw new Exception("Failed to reject leave request");
+                    }
+                } catch (Exception $e) {
+                    if (isset($logger)) {
+                        $logger->error('LEAVE', 'Failed to reject leave request', $e->getMessage());
+                    }
+                    $message = "Error: " . $e->getMessage();
+                    $messageType = "error";
+                }
+                break;
+        }
+    } else {
+        // Handle old form submission (without action parameter)
+        try {
     $employee_id = $_POST['employee_id'] ?? '';
-    $leave_type = $_POST['leave_type'] ?? '';
+            $leave_type_name = $_POST['leave_type'] ?? '';
     $start_date = $_POST['start_date'] ?? '';
     $end_date = $_POST['end_date'] ?? '';
     $reason = $_POST['reason'] ?? '';
 
+            if (empty($employee_id) || empty($leave_type_name) || empty($start_date) || empty($end_date)) {
+                throw new Exception("All fields are required");
+            }
 
+            // Find leave_type_id by name
+            $leave_type = fetchOne($conn, "SELECT leave_type_id FROM leave_type WHERE leave_name = ?", [$leave_type_name]);
+            if (!$leave_type) {
+                throw new Exception("Leave type not found");
+            }
+            $leave_type_id = $leave_type['leave_type_id'];
+
+            // Calculate total days
+            $start = new DateTime($start_date);
+            $end = new DateTime($end_date);
+            $interval = $start->diff($end);
+            $total_days = $interval->days + 1;
+
+            // Check if employee exists
+            $empCheck = fetchOne($conn, "SELECT employee_id FROM employee WHERE employee_id = ?", [$employee_id]);
+            if (!$empCheck) {
+                throw new Exception("Employee not found");
+            }
+
+            // Insert leave request
+            $sql = "INSERT INTO leave_request (employee_id, leave_type_id, start_date, end_date, total_days, reason, status, date_requested) 
+                    VALUES (?, ?, ?, ?, ?, ?, 'Pending', CURDATE())";
+
+            $stmt = $conn->prepare($sql);
+            $success = $stmt->execute([
+                $employee_id,
+                $leave_type_id,
+                $start_date,
+                $end_date,
+                $total_days,
+                $reason
+            ]);
+
+            if ($success) {
+                if (isset($logger)) {
+                    $logger->info('LEAVE', 'Leave request created', "Employee ID: $employee_id");
+                }
     $success_message = "Leave request submitted successfully!";
+                $messageType = "success";
+            } else {
+                throw new Exception("Failed to submit leave request");
+            }
+        } catch (Exception $e) {
+            if (isset($logger)) {
+                $logger->error('LEAVE', 'Failed to create leave request', $e->getMessage());
+            }
+            $message = "Error: " . $e->getMessage();
+            $messageType = "error";
+        }
+    }
 }
 
-//TEMPORARY DATA LANGS
-$leave_requests = [
-    [
-        'id' => 1,
-        'employee_name' => 'Juan Dela Cruz',
-        'employee_number' => 'EMP001',
-        'leave_type' => 'Sick Leave',
-        'start_date' => '2024-11-01',
-        'end_date' => '2024-11-03',
-        'days' => 3,
-        'reason' => 'Flu and fever',
-        'status' => 'Pending',
-        'date_filed' => '2024-10-25'
-    ],
-    [
-        'id' => 2,
-        'employee_name' => 'Maria Santos',
-        'employee_number' => 'EMP002',
-        'leave_type' => 'Vacation Leave',
-        'start_date' => '2024-11-15',
-        'end_date' => '2024-11-20',
-        'days' => 6,
-        'reason' => 'Family vacation',
-        'status' => 'Approved',
-        'date_filed' => '2024-10-20'
-    ],
-    [
-        'id' => 3,
-        'employee_name' => 'Pedro Reyes',
-        'employee_number' => 'EMP003',
-        'leave_type' => 'Emergency Leave',
-        'start_date' => '2024-10-28',
-        'end_date' => '2024-10-28',
-        'days' => 1,
-        'reason' => 'Family emergency',
-        'status' => 'Rejected',
-        'date_filed' => '2024-10-27'
-    ],
-];
+// Fetch leave requests from database
+$status_filter = $_GET['status'] ?? '';
+$search = $_GET['search'] ?? '';
+$filter_type = $_GET['filter'] ?? ''; // 'pending', 'approved_month', 'rejected_month', 'total_month'
+
+$sql = "SELECT lr.*, 
+        e.first_name, e.last_name, e.employee_id,
+        lt.leave_name,
+        u.username as approver_name
+        FROM leave_request lr
+        INNER JOIN employee e ON lr.employee_id = e.employee_id
+        LEFT JOIN leave_type lt ON lr.leave_type_id = lt.leave_type_id
+        LEFT JOIN user_account u ON lr.approver_id = u.user_id
+        WHERE 1=1";
+
+$params = [];
+
+// Handle filter_type from card clicks
+if ($filter_type) {
+    switch ($filter_type) {
+        case 'pending':
+            $sql .= " AND lr.status = 'Pending'";
+            break;
+        case 'approved_month':
+            $sql .= " AND lr.status = 'Approved' AND MONTH(lr.date_approved) = MONTH(CURDATE()) AND YEAR(lr.date_approved) = YEAR(CURDATE())";
+            break;
+        case 'rejected_month':
+            $sql .= " AND lr.status = 'Rejected' AND MONTH(lr.date_approved) = MONTH(CURDATE()) AND YEAR(lr.date_approved) = YEAR(CURDATE())";
+            break;
+        case 'total_month':
+            $sql .= " AND MONTH(lr.date_requested) = MONTH(CURDATE()) AND YEAR(lr.date_requested) = YEAR(CURDATE())";
+            break;
+    }
+} elseif ($status_filter) {
+    $sql .= " AND lr.status = ?";
+    $params[] = $status_filter;
+}
+
+if ($search) {
+    $sql .= " AND (e.first_name LIKE ? OR e.last_name LIKE ? OR lt.leave_name LIKE ?)";
+    $searchTerm = "%$search%";
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
+}
+
+$sql .= " ORDER BY lr.date_requested DESC, lr.leave_request_id DESC";
+
+try {
+    $leave_requests = fetchAll($conn, $sql, $params);
+} catch (Exception $e) {
+    $leave_requests = [];
+    if (isset($logger)) {
+        $logger->error('LEAVE', 'Failed to fetch leave requests', $e->getMessage());
+    }
+}
+
+// Calculate statistics
+try {
+    $stats = [
+        'pending' => (int)fetchOne($conn, "SELECT COUNT(*) as total FROM leave_request WHERE status = 'Pending'")['total'],
+        'approved_this_month' => (int)fetchOne($conn, "SELECT COUNT(*) as total FROM leave_request WHERE status = 'Approved' AND MONTH(date_approved) = MONTH(CURDATE()) AND YEAR(date_approved) = YEAR(CURDATE())")['total'],
+        'rejected_this_month' => (int)fetchOne($conn, "SELECT COUNT(*) as total FROM leave_request WHERE status = 'Rejected' AND MONTH(date_approved) = MONTH(CURDATE()) AND YEAR(date_approved) = YEAR(CURDATE())")['total'],
+        'total_this_month' => (int)fetchOne($conn, "SELECT COUNT(*) as total FROM leave_request WHERE MONTH(date_requested) = MONTH(CURDATE()) AND YEAR(date_requested) = YEAR(CURDATE())")['total']
+    ];
+} catch (Exception $e) {
+    $stats = [
+        'pending' => 0,
+        'approved_this_month' => 0,
+        'rejected_this_month' => 0,
+        'total_this_month' => 0
+    ];
+}
+
+// Fetch leave types for dropdown
+try {
+    $leave_types = fetchAll($conn, "SELECT * FROM leave_type ORDER BY leave_name");
+} catch (Exception $e) {
+    $leave_types = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -73,6 +311,26 @@ $leave_requests = [
     <link rel="stylesheet" href="css/styles.css">
 
     <style>
+        @media (max-width: 768px) {
+            .mobile-card {
+                display: block;
+            }
+
+            .desktop-table {
+                display: none;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .mobile-card {
+                display: none;
+            }
+
+            .desktop-table {
+                display: table;
+            }
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -137,88 +395,140 @@ $leave_requests = [
         </header>
 
         <!-- Main Content -->
-        <main class="p-4 lg:p-8">
-            <?php if (isset($success_message)): ?>
-                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+        <main class="p-3 sm:p-4 lg:p-8">
+            <?php if ($success_message): ?>
+                <div class="mb-4 p-4 rounded-lg bg-green-100 text-green-800">
                     <?php echo htmlspecialchars($success_message); ?>
+                </div>
+            <?php endif; ?>
+            
+            <?php if ($message && $messageType === 'error'): ?>
+                <div class="mb-4 p-4 rounded-lg bg-red-100 text-red-800">
+                    <?php echo htmlspecialchars($message); ?>
                 </div>
             <?php endif; ?>
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6 lg:mb-8">
-                <div class="bg-white rounded-lg p-4 lg:p-6 shadow-lg">
-                    <h3 class="text-sm text-gray-600 mb-2">Pending Requests</h3>
-                    <p class="text-2xl lg:text-3xl font-bold text-yellow-600">12</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-4 lg:mb-6">
+                <div onclick="filterByCard('pending')" 
+                     class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors <?php echo $filter_type === 'pending' ? 'ring-4 ring-teal-300' : ''; ?>">
+                    <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">Pending Requests</h3>
+                    <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $stats['pending']; ?></p>
                 </div>
 
-                <div class="bg-white rounded-lg p-4 lg:p-6 shadow-lg">
-                    <h3 class="text-sm text-gray-600 mb-2">Approved This Month</h3>
-                    <p class="text-2xl lg:text-3xl font-bold text-green-600">25</p>
+                <div onclick="filterByCard('approved_month')" 
+                     class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors <?php echo $filter_type === 'approved_month' ? 'ring-4 ring-teal-300' : ''; ?>">
+                    <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">Approved This Month</h3>
+                    <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $stats['approved_this_month']; ?></p>
                 </div>
 
-                <div class="bg-white rounded-lg p-4 lg:p-6 shadow-lg">
-                    <h3 class="text-sm text-gray-600 mb-2">Rejected This Month</h3>
-                    <p class="text-2xl lg:text-3xl font-bold text-red-600">3</p>
+                <div onclick="filterByCard('rejected_month')" 
+                     class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors <?php echo $filter_type === 'rejected_month' ? 'ring-4 ring-teal-300' : ''; ?>">
+                    <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">Rejected This Month</h3>
+                    <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $stats['rejected_this_month']; ?></p>
                 </div>
 
-                <div class="bg-white rounded-lg p-4 lg:p-6 shadow-lg">
-                    <h3 class="text-sm text-gray-600 mb-2">Total This Month</h3>
-                    <p class="text-2xl lg:text-3xl font-bold text-teal-600">40</p>
+                <div onclick="filterByCard('total_month')" 
+                     class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors <?php echo $filter_type === 'total_month' ? 'ring-4 ring-teal-300' : ''; ?>">
+                    <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">Total This Month</h3>
+                    <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $stats['total_this_month']; ?></p>
                 </div>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="mb-6">
-                <button
-                    onclick="openModal()"
-                    class="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-6 py-3 rounded-lg transition duration-200">
-                    New Leave Request
-                </button>
+            <!-- Action Buttons and Filters -->
+            <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6 mb-4 lg:mb-6">
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <button
+                        onclick="openModal()"
+                        class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
+                        + New Leave Request
+                    </button>
+                    <?php if ($filter_type): ?>
+                        <a href="leave.php" class="bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-lg font-medium text-sm">
+                            Clear Filter
+                        </a>
+                    <?php else: ?>
+                        <a href="?status=" class="bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-lg font-medium text-sm <?php echo !$status_filter ? 'bg-teal-700 text-white hover:bg-teal-800' : ''; ?>">
+                            All
+                        </a>
+                        <a href="?status=Pending" class="bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-lg font-medium text-sm <?php echo $status_filter === 'Pending' ? 'bg-teal-700 text-white hover:bg-teal-800' : ''; ?>">
+                            Pending
+                        </a>
+                        <a href="?status=Approved" class="bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-lg font-medium text-sm <?php echo $status_filter === 'Approved' ? 'bg-teal-700 text-white hover:bg-teal-800' : ''; ?>">
+                            Approved
+                        </a>
+                        <a href="?status=Rejected" class="bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-lg font-medium text-sm <?php echo $status_filter === 'Rejected' ? 'bg-teal-700 text-white hover:bg-teal-800' : ''; ?>">
+                            Rejected
+                        </a>
+                    <?php endif; ?>
+                </div>
+
+                <form method="GET" id="filterForm" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <?php if ($filter_type): ?>
+                        <input type="hidden" name="filter" value="<?php echo htmlspecialchars($filter_type); ?>">
+                    <?php else: ?>
+                        <input type="hidden" name="status" value="<?php echo htmlspecialchars($status_filter); ?>">
+                    <?php endif; ?>
+                    <input type="text" name="search" id="searchInput" value="<?php echo htmlspecialchars($search); ?>"
+                        placeholder="Search Employee or Leave Type"
+                        class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
+                    <div class="flex gap-2">
+                        <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium text-sm">
+                            Search
+                        </button>
+                        <button type="button" onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium text-sm">
+                            Clear
+                        </button>
+                    </div>
+                </form>
             </div>
 
             <!-- Leave Requests Table -->
-            <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-                <div class="p-4 lg:p-6 border-b border-gray-200">
-                    <h3 class="text-lg lg:text-xl font-bold text-gray-800">Leave Requests</h3>
-                </div>
-
+            <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6">
                 <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leave Type</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <table class="desktop-table w-full">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200">
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Employee</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Leave Type</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Duration</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Days</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Reason</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody>
+                            <?php if (empty($leave_requests)): ?>
+                                <tr>
+                                    <td colspan="7" class="px-3 py-8 text-center text-gray-500">No leave requests found</td>
+                                </tr>
+                            <?php else: ?>
                             <?php foreach ($leave_requests as $request): ?>
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-4 whitespace-nowrap">
-                                        <div class="font-medium text-gray-900"><?php echo htmlspecialchars($request['employee_name']); ?></div>
-                                        <div class="text-sm text-gray-500"><?php echo htmlspecialchars($request['employee_number']); ?></div>
+                                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                        <td class="px-3 py-2 text-sm">
+                                            <div class="font-medium text-gray-900">
+                                                <?php echo htmlspecialchars(trim(($request['first_name'] ?? '') . ' ' . ($request['last_name'] ?? ''))); ?>
+                                            </div>
+                                            <div class="text-xs text-gray-500">ID: <?php echo htmlspecialchars($request['employee_id'] ?? 'N/A'); ?></div>
                                     </td>
-                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <?php echo htmlspecialchars($request['leave_type']); ?>
+                                        <td class="px-3 py-2 text-sm text-gray-900">
+                                            <?php echo htmlspecialchars($request['leave_name'] ?? 'N/A'); ?>
                                     </td>
-                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <?php echo date('M d', strtotime($request['start_date'])); ?> -
-                                        <?php echo date('M d, Y', strtotime($request['end_date'])); ?>
+                                        <td class="px-3 py-2 text-sm text-gray-900">
+                                            <?php echo date('M d', strtotime($request['start_date'])); ?> - <?php echo date('M d, Y', strtotime($request['end_date'])); ?>
                                     </td>
-                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <?php echo $request['days']; ?> day<?php echo $request['days'] > 1 ? 's' : ''; ?>
+                                        <td class="px-3 py-2 text-sm text-gray-900">
+                                            <?php echo $request['total_days'] ?? 0; ?> day<?php echo ($request['total_days'] ?? 0) > 1 ? 's' : ''; ?>
                                     </td>
-                                    <td class="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">
-                                        <?php echo htmlspecialchars($request['reason']); ?>
+                                        <td class="px-3 py-2 text-sm text-gray-900 max-w-xs truncate" title="<?php echo htmlspecialchars($request['reason'] ?? ''); ?>">
+                                            <?php echo htmlspecialchars($request['reason'] ?? 'N/A'); ?>
                                     </td>
-                                    <td class="px-4 py-4 whitespace-nowrap">
+                                        <td class="px-3 py-2">
                                         <?php
+                                            $status = $request['status'] ?? 'Pending';
                                         $status_color = '';
-                                        switch ($request['status']) {
+                                            switch ($status) {
                                             case 'Pending':
                                                 $status_color = 'bg-yellow-100 text-yellow-800';
                                                 break;
@@ -228,60 +538,154 @@ $leave_requests = [
                                             case 'Rejected':
                                                 $status_color = 'bg-red-100 text-red-800';
                                                 break;
+                                                default:
+                                                    $status_color = 'bg-gray-100 text-gray-800';
                                         }
                                         ?>
                                         <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $status_color; ?>">
-                                            <?php echo htmlspecialchars($request['status']); ?>
+                                                <?php echo htmlspecialchars($status); ?>
                                         </span>
                                     </td>
-                                    <td class="px-4 py-4 whitespace-nowrap text-sm">
-                                        <?php if ($request['status'] === 'Pending'): ?>
-                                            <button onclick="approveLeave(<?php echo $request['id']; ?>)" class="text-green-600 hover:text-green-900 mr-3">Approve</button>
-                                            <button onclick="rejectLeave(<?php echo $request['id']; ?>)" class="text-red-600 hover:text-red-900">Reject</button>
+                                        <td class="px-3 py-2">
+                                            <?php if ($status === 'Pending'): ?>
+                                                <div class="flex gap-2">
+                                                    <button type="button" onclick="showConfirmApprove(<?php echo $request['leave_request_id']; ?>)" 
+                                                            class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">
+                                                        Approve
+                                                    </button>
+                                                    <button type="button" onclick="showConfirmReject(<?php echo $request['leave_request_id']; ?>)" 
+                                                            class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs">
+                                                        Reject
+                                                    </button>
+                                                </div>
                                         <?php else: ?>
-                                            <button onclick="viewLeave(<?php echo $request['id']; ?>)" class="text-teal-600 hover:text-teal-900">View</button>
+                                                <span class="text-gray-500 text-xs">
+                                                    <?php if ($request['approver_name']): ?>
+                                                        By: <?php echo htmlspecialchars($request['approver_name']); ?>
+                                                    <?php endif; ?>
+                                                    <?php if ($request['date_approved']): ?>
+                                                        <br><?php echo date('M d, Y', strtotime($request['date_approved'])); ?>
+                                                    <?php endif; ?>
+                                                </span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
+                            <?php endif; ?>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Mobile Card View -->
+                <div class="mobile-card space-y-3">
+                    <?php if (empty($leave_requests)): ?>
+                        <div class="text-center text-gray-500 py-8">No leave requests found</div>
+                    <?php else: ?>
+                        <?php foreach ($leave_requests as $request): ?>
+                            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">
+                                            <?php echo htmlspecialchars(trim(($request['first_name'] ?? '') . ' ' . ($request['last_name'] ?? ''))); ?>
+                                        </h3>
+                                        <p class="text-xs text-gray-500">ID: <?php echo htmlspecialchars($request['employee_id'] ?? 'N/A'); ?></p>
+                                    </div>
+                                    <?php
+                                    $status = $request['status'] ?? 'Pending';
+                                    $status_color = '';
+                                    switch ($status) {
+                                        case 'Pending':
+                                            $status_color = 'bg-yellow-100 text-yellow-800';
+                                            break;
+                                        case 'Approved':
+                                            $status_color = 'bg-green-100 text-green-800';
+                                            break;
+                                        case 'Rejected':
+                                            $status_color = 'bg-red-100 text-red-800';
+                                            break;
+                                        default:
+                                            $status_color = 'bg-gray-100 text-gray-800';
+                                    }
+                                    ?>
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $status_color; ?>">
+                                        <?php echo htmlspecialchars($status); ?>
+                                    </span>
+                                </div>
+                                <div class="space-y-2 mb-3 text-sm">
+                                    <div><span class="text-gray-500">Leave Type:</span> <?php echo htmlspecialchars($request['leave_name'] ?? 'N/A'); ?></div>
+                                    <div><span class="text-gray-500">Duration:</span> <?php echo date('M d', strtotime($request['start_date'])); ?> - <?php echo date('M d, Y', strtotime($request['end_date'])); ?></div>
+                                    <div><span class="text-gray-500">Days:</span> <?php echo $request['total_days'] ?? 0; ?> day<?php echo ($request['total_days'] ?? 0) > 1 ? 's' : ''; ?></div>
+                                    <div><span class="text-gray-500">Reason:</span> <?php echo htmlspecialchars($request['reason'] ?? 'N/A'); ?></div>
+                                    <?php if ($request['approver_name'] || $request['date_approved']): ?>
+                                        <div class="text-xs text-gray-500">
+                                            <?php if ($request['approver_name']): ?>
+                                                Approved by: <?php echo htmlspecialchars($request['approver_name']); ?>
+                                            <?php endif; ?>
+                                            <?php if ($request['date_approved']): ?>
+                                                on <?php echo date('M d, Y', strtotime($request['date_approved'])); ?>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($status === 'Pending'): ?>
+                                    <div class="flex gap-2">
+                                        <button type="button" onclick="showConfirmApprove(<?php echo $request['leave_request_id']; ?>)" 
+                                                class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm">
+                                            Approve
+                                        </button>
+                                        <button type="button" onclick="showConfirmReject(<?php echo $request['leave_request_id']; ?>)" 
+                                                class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm">
+                                            Reject
+                                        </button>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
         </main>
     </div>
 
     <!-- New Leave Request Modal -->
-    <div id="leaveModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-gray-900">New Leave Request</h3>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+    <div id="leaveModal" class="modal">
+        <div class="modal-content max-w-2xl w-full mx-4">
+            <div class="bg-teal-700 text-white p-4 rounded-t-lg">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">New Leave Request</h3>
+                    <button onclick="closeModal()" class="text-white hover:text-gray-200 text-2xl">&times;</button>
+                </div>
             </div>
+            <div class="p-6">
 
             <form method="POST" action="" id="leaveForm">
+                <input type="hidden" name="action" value="add">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Employee Number</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
                         <input
-                            type="text"
+                            type="number"
                             name="employee_id"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                            placeholder="Enter Employee ID"
                             required>
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Leave Type</label>
                         <select
-                            name="leave_type"
+                            name="leave_type_id"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                             required>
                             <option value="">Select Leave Type</option>
-                            <option value="Sick Leave">Sick Leave</option>
-                            <option value="Vacation Leave">Vacation Leave</option>
-                            <option value="Emergency Leave">Emergency Leave</option>
-                            <option value="Maternity Leave">Maternity Leave</option>
-                            <option value="Paternity Leave">Paternity Leave</option>
+                            <?php foreach ($leave_types as $lt): ?>
+                                <option value="<?php echo $lt['leave_type_id']; ?>">
+                                    <?php echo htmlspecialchars($lt['leave_name']); ?>
+                                    <?php if ($lt['paid_unpaid']): ?>
+                                        (<?php echo htmlspecialchars($lt['paid_unpaid']); ?>)
+                                    <?php endif; ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                 </div>
@@ -324,15 +728,57 @@ $leave_requests = [
                     </button>
                     <button
                         type="submit"
-                        class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+                        class="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800">
                         Submit Request
                     </button>
                 </div>
             </form>
+            </div>
         </div>
     </div>
 
+    <script src="js/modal.js"></script>
     <script src="js/leave.js"></script>
+
+    <!-- Alert Modal -->
+    <div id="alertModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="modal-header bg-teal-700 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold" id="alertModalTitle">Information</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6" id="alertModalMessage"></p>
+                <div class="flex justify-end">
+                    <button onclick="closeAlertModal()" 
+                            class="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition">
+                        OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="bg-yellow-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Confirm Action</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6" id="confirmModalMessage"></p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="handleCancel()" 
+                            class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                        Cancel
+                    </button>
+                    <button onclick="handleConfirm()" 
+                            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="logoutModal" class="modal">
     <div class="modal-content max-w-md w-full mx-4">

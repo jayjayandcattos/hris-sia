@@ -268,22 +268,26 @@ $to_evaluate = 0;
 
 $statsSql = "SELECT 
              COUNT(*) as total,
-             SUM(CASE WHEN application_status = 'To Interview' THEN 1 ELSE 0 END) as interview,
-             SUM(CASE WHEN application_status = 'To Evaluate' THEN 1 ELSE 0 END) as evaluate
+             COALESCE(SUM(CASE WHEN application_status = 'To Interview' THEN 1 ELSE 0 END), 0) as interview,
+             COALESCE(SUM(CASE WHEN application_status = 'To Evaluate' THEN 1 ELSE 0 END), 0) as evaluate
              FROM applicant
              WHERE application_status != 'Archived'";
 $stats = fetchOne($conn, $statsSql);
 
 if ($stats) {
-    $total_applicants = $stats['total'];
-    $to_interview = $stats['interview'];
-    $to_evaluate = $stats['evaluate'];
+    $total_applicants = (int)($stats['total'] ?? 0);
+    $to_interview = (int)($stats['interview'] ?? 0);
+    $to_evaluate = (int)($stats['evaluate'] ?? 0);
+} else {
+    $total_applicants = 0;
+    $to_interview = 0;
+    $to_evaluate = 0;
 }
 
 // Count archived
 $archivedSql = "SELECT COUNT(*) as archived FROM applicant WHERE application_status = 'Archived'";
 $archivedStats = fetchOne($conn, $archivedSql);
-$archived_count = $archivedStats['archived'] ?? 0;
+$archived_count = (int)($archivedStats['archived'] ?? 0);
 
 // Fetch recruitment positions for dropdown
 $recruitments = fetchAll($conn, "SELECT r.*, d.department_name 
@@ -395,15 +399,15 @@ $noRecruitments = empty($recruitments);
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-4 lg:mb-6">
                     <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors" onclick="filterByStatus('all')">
                         <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">Total Applicant</h3>
-                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $total_applicants; ?></p>
+                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo (int)$total_applicants; ?></p>
                     </div>
                     <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors" onclick="filterByStatus('To Interview')">
                         <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">To Interview</h3>
-                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $to_interview; ?></p>
+                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo (int)$to_interview; ?></p>
                     </div>
                     <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6 cursor-pointer hover:bg-teal-800 transition-colors" onclick="filterByStatus('To Evaluate')">
                         <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">To Evaluate</h3>
-                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $to_evaluate; ?></p>
+                        <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo (int)$to_evaluate; ?></p>
                     </div>
                 </div>
             <?php endif; ?>

@@ -22,9 +22,30 @@ function getCount($conn, $table, $whereClause = '') {
 }
 
 function getMonthlyData($conn, $table, $dateField) {
+    // Handle special case for applicant table which doesn't have a created_at field
+    // We'll use the recruitment date_posted through a join
+    if ($table === 'applicant' && $dateField === 'created_at') {
+        try {
+            $sql = "SELECT DATE_FORMAT(r.date_posted, '%b') as month, COUNT(*) as count 
+                    FROM applicant a
+                    LEFT JOIN recruitment r ON a.recruitment_id = r.recruitment_id
+                    WHERE a.application_status != 'Archived'
+                    AND r.date_posted IS NOT NULL
+                    AND YEAR(r.date_posted) = YEAR(CURDATE())
+                    GROUP BY MONTH(r.date_posted)
+                    ORDER BY MONTH(r.date_posted)";
+            $result = fetchAll($conn, $sql);
+            return ($result && !isset($result['error'])) ? $result : [];
+        } catch (Exception $e) {
+            // If that fails, return empty array - we'll show 0 for all months
+            return [];
+        }
+    }
+    
     $sql = "SELECT DATE_FORMAT({$dateField}, '%b') as month, COUNT(*) as count 
             FROM {$table} 
-            WHERE YEAR({$dateField}) = YEAR(CURDATE())
+            WHERE {$dateField} IS NOT NULL
+            AND YEAR({$dateField}) = YEAR(CURDATE())
             GROUP BY MONTH({$dateField})
             ORDER BY MONTH({$dateField})";
     
@@ -43,17 +64,58 @@ function processMonthlyData($data, $months) {
     return $counts;
 }
 
+function getYearlyData($conn, $table, $dateField, $yearsBack = 10) {
+    $currentYear = (int)date('Y');
+    $startYear = $currentYear - $yearsBack;
+    
+    $sql = "SELECT YEAR({$dateField}) as year, COUNT(*) as count 
+            FROM {$table} 
+            WHERE {$dateField} IS NOT NULL
+            AND YEAR({$dateField}) >= ?
+            GROUP BY YEAR({$dateField})
+            ORDER BY YEAR({$dateField})";
+    
+    try {
+        $result = fetchAll($conn, $sql, [$startYear]);
+        return ($result && !isset($result['error'])) ? $result : [];
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+function processYearlyData($data, $years) {
+    $counts = array_fill(0, count($years), 0);
+    foreach ($data as $row) {
+        $yearIndex = array_search((int)$row['year'], $years);
+        if ($yearIndex !== false) {
+            $counts[$yearIndex] = (int)$row['count'];
+        }
+    }
+    return $counts;
+}
+
+// Get total employees count (all employees, not just active)
 $stats = [
-    'employees' => getCount($conn, 'employee', "employment_status = 'Active'"),
-    'interviews' => getCount($conn, 'interview', "interview_result = 'Scheduled'"),
+    'employees' => getCount($conn, 'employee', ''),
+    'applicants' => getCount($conn, 'applicant', "application_status != 'Archived'"),
     'events' => getCount($conn, 'recruitment', "MONTH(date_posted) = MONTH(CURDATE()) AND YEAR(date_posted) = YEAR(CURDATE())")
 ];
 
 $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// Get yearly data for employees (last 10 years)
+$currentYear = (int)date('Y');
+$years = range($currentYear - 9, $currentYear);
+$yearsLabels = array_map('strval', $years);
+
+// Get yearly data for employees
+$employeeYearlyData = getYearlyData($conn, 'employee', 'hire_date', 10);
+$employeeYearlyCounts = processYearlyData($employeeYearlyData, $years);
+
+// Get monthly data for other charts
 $chartData = [
-    'employees' => processMonthlyData(getMonthlyData($conn, 'employee', 'hire_date'), $months),
-    'interviews' => processMonthlyData(getMonthlyData($conn, 'interview', 'interview_date'), $months),
+    'employees' => $employeeYearlyCounts,
+    'applicants' => processMonthlyData(getMonthlyData($conn, 'applicant', 'created_at'), $months),
     'events' => processMonthlyData(getMonthlyData($conn, 'recruitment', 'date_posted'), $months)
 ];
 ?>
@@ -163,15 +225,15 @@ $chartData = [
                      onclick="switchChart('employees')">
                     <h3 class="text-base lg:text-lg font-semibold mb-2">Employees</h3>
                     <p class="text-2xl lg:text-3xl font-bold"><?php echo $stats['employees']; ?></p>
-                    <p class="text-xs lg:text-sm opacity-80 mt-2">Total Active Employees</p>
+                    <p class="text-xs lg:text-sm opacity-80 mt-2">Total Employees</p>
                 </div>
 
                 <div class="stat-card bg-teal-700 text-white rounded-lg p-4 lg:p-6 shadow-lg" 
-                     data-chart="interviews"
-                     onclick="switchChart('interviews')">
-                    <h3 class="text-base lg:text-lg font-semibold mb-2">Interviews</h3>
-                    <p class="text-2xl lg:text-3xl font-bold"><?php echo $stats['interviews']; ?></p>
-                    <p class="text-xs lg:text-sm opacity-80 mt-2">Scheduled Interviews</p>
+                     data-chart="applicants"
+                     onclick="switchChart('applicants')">
+                    <h3 class="text-base lg:text-lg font-semibold mb-2">Applicants</h3>
+                    <p class="text-2xl lg:text-3xl font-bold"><?php echo $stats['applicants']; ?></p>
+                    <p class="text-xs lg:text-sm opacity-80 mt-2">Total Applicants</p>
                 </div>
 
                 <div class="stat-card bg-teal-700 text-white rounded-lg p-4 lg:p-6 shadow-lg sm:col-span-2 lg:col-span-1" 
@@ -219,24 +281,31 @@ $chartData = [
     <script>
         const chartConfig = {
             months: <?php echo json_encode($months); ?>,
+            years: <?php echo json_encode($yearsLabels); ?>,
             data: {
                 employees: {
                     data: <?php echo json_encode($chartData['employees']); ?>,
+                    labels: <?php echo json_encode($yearsLabels); ?>,
                     label: 'Employees Hired',
-                    title: 'NUMBER OF EMPLOYEES',
-                    color: '#0d9488'
+                    title: 'NUMBER OF EMPLOYEES (YEARLY)',
+                    color: '#0d9488',
+                    isYearly: true
                 },
-                interviews: {
-                    data: <?php echo json_encode($chartData['interviews']); ?>,
-                    label: 'Interviews Scheduled',
-                    title: 'NUMBER OF INTERVIEWS',
-                    color: '#0891b2'
+                applicants: {
+                    data: <?php echo json_encode($chartData['applicants']); ?>,
+                    labels: <?php echo json_encode($months); ?>,
+                    label: 'Applicants',
+                    title: 'NUMBER OF APPLICANTS',
+                    color: '#0891b2',
+                    isYearly: false
                 },
                 events: {
                     data: <?php echo json_encode($chartData['events']); ?>,
+                    labels: <?php echo json_encode($months); ?>,
                     label: 'Recruitment Events',
                     title: 'NUMBER OF EVENTS',
-                    color: '#059669'
+                    color: '#059669',
+                    isYearly: false
                 }
             }
         };
@@ -278,10 +347,13 @@ $chartData = [
             chartContainer.style.opacity = '0';
             
             setTimeout(() => {
+                // Use yearly labels for employees, monthly for others
+                const labels = config.isYearly ? config.labels : chartConfig.months;
+                
                 currentChart = new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: chartConfig.months,
+                        labels: labels,
                         datasets: [{
                             label: config.label,
                             data: config.data,

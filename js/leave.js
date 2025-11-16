@@ -1,14 +1,34 @@
 
 function openModal() {
-    document.getElementById('leaveModal').classList.remove('hidden');
+    document.getElementById('leaveModal').classList.add('active');
     document.body.style.overflow = 'hidden'; 
 }
 
 
 function closeModal() {
-    document.getElementById('leaveModal').classList.add('hidden');
+    document.getElementById('leaveModal').classList.remove('active');
     document.body.style.overflow = 'auto'; 
-    document.getElementById('leaveForm').reset();
+    if (document.getElementById('leaveForm')) {
+        document.getElementById('leaveForm').reset();
+    }
+}
+
+function clearFilters() {
+    window.location.href = 'leave.php';
+}
+
+function filterByCard(filterType) {
+    // Get current URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Set the filter parameter
+    urlParams.set('filter', filterType);
+    
+    // Remove status filter if it exists (card filters take precedence)
+    urlParams.delete('status');
+    
+    // Redirect to the filtered page
+    window.location.href = 'leave.php?' + urlParams.toString();
 }
 
 
@@ -26,29 +46,48 @@ document.addEventListener('keydown', function(e) {
 });
 
 
-function approveLeave(id) {
-    if (confirm('Are you sure you want to approve this leave request?')) {
-        
-        
-        alert('Leave request #' + id + ' approved!');
-        location.reload();
-    }
+function showConfirmApprove(leaveRequestId) {
+    showConfirmModal(
+        'Are you sure you want to approve this leave request?',
+        function() {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = `
+                <input type="hidden" name="action" value="approve">
+                <input type="hidden" name="leave_request_id" value="${leaveRequestId}">
+            `;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    );
 }
 
+function showConfirmReject(leaveRequestId) {
+    showConfirmModal(
+        'Are you sure you want to reject this leave request?',
+        function() {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = `
+                <input type="hidden" name="action" value="reject">
+                <input type="hidden" name="leave_request_id" value="${leaveRequestId}">
+            `;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    );
+}
+
+function approveLeave(id) {
+    showConfirmApprove(id);
+}
 
 function rejectLeave(id) {
-    if (confirm('Are you sure you want to reject this leave request?')) {
-        
-        
-        alert('Leave request #' + id + ' rejected!');
-        location.reload();
-    }
+    showConfirmReject(id);
 }
 
-
 function viewLeave(id) {
-    
-    alert('View details for leave request #' + id);
+    showAlertModal('View details for leave request #' + id, 'info');
 }
 
 

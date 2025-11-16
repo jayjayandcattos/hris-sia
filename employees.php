@@ -704,6 +704,49 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
             }
         });
     </script>
+
+    <!-- Alert Modal -->
+    <div id="alertModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="modal-header bg-teal-700 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold" id="alertModalTitle">Information</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6" id="alertModalMessage"></p>
+                <div class="flex justify-end">
+                    <button onclick="closeAlertModal()" 
+                            class="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition">
+                        OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="bg-yellow-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Confirm Action</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6" id="confirmModalMessage"></p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="handleCancel()" 
+                            class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                        Cancel
+                    </button>
+                    <button onclick="handleConfirm()" 
+                            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/modal.js"></script>
+    <script src="js/employee.js"></script>
 </body>
 
 </html>

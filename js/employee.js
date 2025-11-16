@@ -29,17 +29,20 @@
         }
 
         function addEmployee() {
-            alert('backend pa');
+            showAlertModal('backend pa', 'info');
         }
 
         function editEmployee(id) {
-            alert('Edit Employee: ' + id + ' - backend pa');
+            showAlertModal('Edit Employee: ' + id + ' - backend pa', 'info');
         }
 
         function archiveEmployee(id) {
-            if (confirm('Are you sure you want to archive this employee?')) {
-                alert('Archive Employee: ' + id + ' - backend pa');
-            }
+            showConfirmModal(
+                'Are you sure you want to archive this employee?',
+                function() {
+                    showAlertModal('Archive Employee: ' + id + ' - backend pa', 'info');
+                }
+            );
         }
 
 

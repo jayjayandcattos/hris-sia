@@ -309,13 +309,10 @@ if ($date_filter == date('Y-m-d')) {
                                         </td>
                                         <td class="px-3 py-2">
                                             <?php if (!$record['time_out']): ?>
-                                                <form method="POST" style="display: inline;" onsubmit="return confirm('Record time-out for this employee?');">
-                                                    <input type="hidden" name="action" value="time_out">
-                                                    <input type="hidden" name="attendance_id" value="<?php echo htmlspecialchars($record['attendance_id']); ?>">
-                                                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                        Time Out
-                                                    </button>
-                                                </form>
+                                                <button type="button" onclick="showConfirmTimeOut(<?php echo htmlspecialchars($record['attendance_id']); ?>)" 
+                                                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                    Time Out
+                                                </button>
                                             <?php else: ?>
                                                 <span class="text-green-600 text-xs font-medium">✓ Complete</span>
                                             <?php endif; ?>
@@ -375,13 +372,10 @@ if ($date_filter == date('Y-m-d')) {
                                 </div>
 
                                 <?php if (!$record['time_out']): ?>
-                                    <form method="POST" onsubmit="return confirm('Record time-out for this employee?');">
-                                        <input type="hidden" name="action" value="time_out">
-                                        <input type="hidden" name="attendance_id" value="<?php echo htmlspecialchars($record['attendance_id']); ?>">
-                                        <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors">
-                                            Time Out
-                                        </button>
-                                    </form>
+                                    <button type="button" onclick="showConfirmTimeOut(<?php echo htmlspecialchars($record['attendance_id']); ?>)" 
+                                            class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors">
+                                        Time Out
+                                    </button>
                                 <?php else: ?>
                                     <div class="text-center text-green-600 text-sm font-medium py-2">✓ Complete</div>
                                 <?php endif; ?>
@@ -509,7 +503,7 @@ if ($date_filter == date('Y-m-d')) {
             });
 
             if (visibleRecords.length === 0) {
-                alert('No records to export');
+                showAlertModal('No records to export', 'warning');
                 return;
             }
 
@@ -582,7 +576,65 @@ if ($date_filter == date('Y-m-d')) {
                 closeLogoutModal();
             }
         });
+
+        function showConfirmTimeOut(attendanceId) {
+            showConfirmModal(
+                'Record time-out for this employee?',
+                function() {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.innerHTML = `
+                        <input type="hidden" name="action" value="time_out">
+                        <input type="hidden" name="attendance_id" value="${attendanceId}">
+                    `;
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            );
+        }
     </script>
+
+    <!-- Alert Modal -->
+    <div id="alertModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="modal-header bg-teal-700 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold" id="alertModalTitle">Information</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6" id="alertModalMessage"></p>
+                <div class="flex justify-end">
+                    <button onclick="closeAlertModal()" 
+                            class="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition">
+                        OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="bg-yellow-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Confirm Action</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6" id="confirmModalMessage"></p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="handleCancel()" 
+                            class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                        Cancel
+                    </button>
+                    <button onclick="handleConfirm()" 
+                            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/modal.js"></script>
 </body>
 
 </html>

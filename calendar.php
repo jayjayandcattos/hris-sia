@@ -348,22 +348,47 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
         </div>
     </div>
 
-    <!-- Success Modal -->
-    <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
-            <div class="mb-4">
-                <svg class="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
+    <!-- Alert Modal -->
+    <div id="alertModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="modal-header bg-teal-700 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold" id="alertModalTitle">Information</h2>
             </div>
-            <h3 class="text-xl font-bold text-gray-800 mb-2">Success!</h3>
-            <p id="successMessage" class="text-gray-600 mb-4">Event has been added successfully.</p>
-            <button onclick="closeSuccessModal()" class="bg-teal-700 hover:bg-teal-800 text-white px-6 py-2 rounded-lg font-medium">
-                OK
-            </button>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6" id="alertModalMessage"></p>
+                <div class="flex justify-end">
+                    <button onclick="closeAlertModal()" 
+                            class="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition">
+                        OK
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content max-w-md w-full mx-4">
+            <div class="bg-yellow-600 text-white p-4 rounded-t-lg">
+                <h2 class="text-xl font-bold">Confirm Action</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-6" id="confirmModalMessage"></p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="handleCancel()" 
+                            class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                        Cancel
+                    </button>
+                    <button onclick="handleConfirm()" 
+                            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/modal.js"></script>
     <script>
         let events = <?php echo json_encode($events); ?>;
         let currentView = 'yearly';
@@ -570,10 +595,10 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
                     showSuccess('Event has been added successfully.');
                     setTimeout(() => location.reload(), 1500);
                 } else {
-                    alert('Error: ' + result.message);
+                    showAlertModal('Error: ' + result.message, 'error');
                 }
             } catch (error) {
-                alert('Error adding event: ' + error.message);
+                showAlertModal('Error adding event: ' + error.message, 'error');
             }
         }
 
@@ -614,15 +639,23 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
                     showSuccess('Event has been updated successfully.');
                     setTimeout(() => location.reload(), 1500);
                 } else {
-                    alert('Error: ' + result.message);
+                    showAlertModal('Error: ' + result.message, 'error');
                 }
             } catch (error) {
-                alert('Error updating event: ' + error.message);
+                showAlertModal('Error updating event: ' + error.message, 'error');
             }
         }
 
         async function deleteEvent() {
-            if (!confirm('Are you sure you want to delete this event?')) return;
+            showConfirmModal(
+                'Are you sure you want to delete this event?',
+                async function() {
+                    await performDeleteEvent();
+                }
+            );
+        }
+
+        async function performDeleteEvent() {
 
             const formData = new FormData();
             formData.append('action', 'delete_event');
@@ -641,20 +674,19 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
                     showSuccess('Event has been deleted successfully.');
                     setTimeout(() => location.reload(), 1500);
                 } else {
-                    alert('Error: ' + result.message);
+                    showAlertModal('Error: ' + result.message, 'error');
                 }
             } catch (error) {
-                alert('Error deleting event: ' + error.message);
+                showAlertModal('Error deleting event: ' + error.message, 'error');
             }
         }
 
         function showSuccess(message) {
-            document.getElementById('successMessage').textContent = message;
-            document.getElementById('successModal').classList.remove('hidden');
-        }
-
-        function closeSuccessModal() {
-            document.getElementById('successModal').classList.add('hidden');
+            showAlertModal(message, 'success');
+            setTimeout(() => {
+                closeAlertModal();
+                location.reload();
+            }, 1500);
         }
 
         function openLogoutModal() {
