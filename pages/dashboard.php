@@ -62,16 +62,21 @@ function processMonthlyData($data, $months) {
     return $counts;
 }
 
-function getYearlyData($conn, $table, $dateField, $yearsBack = 10) {
+function getYearlyData($conn, $table, $dateField, $yearsBack = 10, $whereClause = '') {
     $currentYear = (int)date('Y');
     $startYear = $currentYear - $yearsBack;
     
     $sql = "SELECT YEAR({$dateField}) as year, COUNT(*) as count 
             FROM {$table} 
             WHERE {$dateField} IS NOT NULL
-            AND YEAR({$dateField}) >= ?
-            GROUP BY YEAR({$dateField})
-            ORDER BY YEAR({$dateField})";
+            AND YEAR({$dateField}) >= ?";
+    
+    if ($whereClause) {
+        $sql .= " AND {$whereClause}";
+    }
+    
+    $sql .= " GROUP BY YEAR({$dateField})
+              ORDER BY YEAR({$dateField})";
     
     try {
         $result = fetchAll($conn, $sql, [$startYear]);
@@ -92,9 +97,9 @@ function processYearlyData($data, $years) {
     return $counts;
 }
 
-// Get total employees count (all employees, not just active)
+// Get total employees count (only ACTIVE employees)
 $stats = [
-    'employees' => getCount($conn, 'employee', ''),
+    'employees' => getCount($conn, 'employee', "employment_status = 'Active'"),
     'applicants' => getCount($conn, 'applicant', "application_status != 'Archived'"),
     'events' => getCount($conn, 'recruitment', "MONTH(date_posted) = MONTH(CURDATE()) AND YEAR(date_posted) = YEAR(CURDATE())")
 ];
@@ -106,8 +111,8 @@ $currentYear = (int)date('Y');
 $years = range($currentYear - 9, $currentYear);
 $yearsLabels = array_map('strval', $years);
 
-// Get yearly data for employees
-$employeeYearlyData = getYearlyData($conn, 'employee', 'hire_date', 10);
+// Get yearly data for employees (only ACTIVE employees)
+$employeeYearlyData = getYearlyData($conn, 'employee', 'hire_date', 10, "employment_status = 'Active'");
 $employeeYearlyCounts = processYearlyData($employeeYearlyData, $years);
 
 // Get monthly data for other charts
