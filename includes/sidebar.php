@@ -2,13 +2,13 @@
     #mobile-menu-btn {
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         backdrop-filter: blur(10px);
-        background: rgba(15, 118, 110, 0.9) !important;
+        background: rgba(0, 54, 49, 0.9) !important;
     }
 
     #mobile-menu-btn:hover {
         transform: scale(1.1);
-        background: rgba(13, 148, 136, 0.95) !important;
-        box-shadow: 0 8px 25px rgba(13, 148, 136, 0.3);
+        background: rgba(0, 77, 69, 0.95) !important;
+        box-shadow: 0 8px 25px rgba(0, 77, 69, 0.3);
     }
 
     #sidebar {
@@ -36,7 +36,7 @@
     }
 
     #sidebar .p-6 {
-        background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+        background: linear-gradient(135deg, #003631 0%, #002b27 100%);
         margin: -1px -1px 0 -1px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
@@ -97,10 +97,10 @@
     }
 
     #sidebar nav a.bg-teal-700 {
-        background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important;
+        background: linear-gradient(135deg, #004d45 0%, #003631 100%) !important;
         color: white;
         border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);
+        box-shadow: 0 4px 15px rgba(0, 77, 69, 0.3);
         transform: translateX(4px);
     }
 
@@ -125,7 +125,7 @@
 
     #sidebar nav a:not(.bg-teal-700):hover {
         background: white;
-        color: #0f766e;
+        color: #003631;
         transform: translateX(8px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
@@ -177,7 +177,7 @@
 
     #sidebar {
         scrollbar-width: thin;
-        scrollbar-color: rgba(15, 118, 110, 0.3) transparent;
+        scrollbar-color: rgba(0, 54, 49, 0.3) transparent;
     }
 
     #sidebar::-webkit-scrollbar {
@@ -189,15 +189,14 @@
     }
 
     #sidebar::-webkit-scrollbar-thumb {
-        background: rgba(15, 118, 110, 0.3);
+        background: rgba(0, 54, 49, 0.3);
         border-radius: 2px;
     }
 
     #sidebar::-webkit-scrollbar-thumb:hover {
-        background: rgba(15, 118, 110, 0.5);
+        background: rgba(0, 54, 49, 0.5);
     }
 </style>
-
 
 <button id="mobile-menu-btn" class="lg:hidden absolute left-4 -mt-1.5 bg-teal-600 text-white p-2.5 rounded-lg shadow-lg hover:bg-teal-700 transition-colors">
     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

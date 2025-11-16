@@ -1,7 +1,7 @@
 :root {
-  --primary: #0f766e;
-  --primary-light: #0d9488;
-  --primary-dark: #115e59;
+  --primary: #003631;
+  --primary-light: #004d45;
+  --primary-dark: #002b27;
   --accent: #ec4899;
   --accent-light: #f472b6;
   --gray-light: #f8fafc;
@@ -25,7 +25,7 @@ body {
 
 
 .gradient-bg {
-  background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+  background: linear-gradient(135deg, #003631 0%, #002b27 100%);
   position: relative;
   overflow: hidden;
 }
@@ -152,7 +152,7 @@ input[type="password"] {
 input[type="text"]:focus,
 input[type="password"]:focus {
   border-color: var(--primary-light);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 77, 69, 0.1);
 }
 
 button {

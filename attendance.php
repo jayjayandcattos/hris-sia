@@ -47,6 +47,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
+$dedupe_sql = "DELETE a1 FROM attendance a1
+               INNER JOIN attendance a2 
+               WHERE a1.employee_id = a2.employee_id 
+               AND DATE(a1.date) = DATE(a2.date)
+               AND a1.attendance_id > a2.attendance_id";
+try {
+    $conn->exec($dedupe_sql);
+} catch (Exception $e) {
+
+}
+
 $date_filter = $_GET['date'] ?? date('Y-m-d');
 $position_filter = $_GET['position'] ?? '';
 $department_filter = $_GET['department'] ?? '';

@@ -70,3 +70,4 @@ function calculateDays() {
 
 document.querySelector('input[name="start_date"]')?.addEventListener('change', calculateDays);
 document.querySelector('input[name="end_date"]')?.addEventListener('change', calculateDays);
+
