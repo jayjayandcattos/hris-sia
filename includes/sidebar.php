@@ -252,7 +252,7 @@
 
 
     <div class="p-6 border-b border-gray-200 text-center pt-16 lg:pt-6">
-        <img src="./assets/tempfp.jpg"
+        <img src="./assets/PFP1.jpg"
             alt="Profile"
             class="w-20 h-20 rounded-full mx-auto mb-3 object-cover shadow-md">
 
