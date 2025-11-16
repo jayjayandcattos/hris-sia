@@ -128,36 +128,172 @@ $chartData = [
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .card-active {
-            transform: scale(1.02);
-            box-shadow: 0 10px 25px rgba(13, 148, 136, 0.3);
+        body {
+            background: linear-gradient(135deg, #f0fdfa 0%, #e0f2f1 50%, #f8fafc 100%);
+            background-attachment: fixed;
         }
-        
+
+        .stat-card {
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+
+        .card-active {
+            transform: translateY(-4px) scale(1.03);
+            box-shadow: 0 25px 50px rgba(13, 148, 136, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .card-active::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover .stat-icon {
+            transform: scale(1.1) rotate(5deg);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+            margin: 8px 0;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            letter-spacing: -1px;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: 0.3px;
+        }
+
         .chart-container {
             opacity: 0;
-            animation: fadeIn 0.5s ease-in forwards;
+            animation: fadeInUp 0.6s ease-out forwards;
         }
         
-        @keyframes fadeIn {
+        @keyframes fadeInUp {
             from {
                 opacity: 0;
-                transform: translateY(10px);
+                transform: translateY(20px);
             }
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
-        
-        .stat-card {
-            cursor: pointer;
+
+        .chart-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
             transition: all 0.3s ease;
+            border: 1px solid rgba(0, 0, 0, 0.05);
         }
-        
-        .stat-card:hover {
+
+        .chart-card:hover {
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05);
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .chart-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 24px;
+            letter-spacing: -0.5px;
+            position: relative;
+            padding-bottom: 12px;
+        }
+
+        .chart-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #0d9488, #14b8a6);
+            border-radius: 2px;
+        }
+
+        .header-gradient {
+            background: linear-gradient(135deg, #003631 0%, #004d45 50%, #002b27 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(236, 72, 153, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .header-gradient > * {
+            position: relative;
+            z-index: 1;
         }
 
         .modal {
@@ -168,7 +304,8 @@ $chartData = [
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
             animation: fadeInModal 0.3s ease;
         }
 
@@ -181,11 +318,12 @@ $chartData = [
         .modal-content {
             background-color: white;
             padding: 0;
-            border-radius: 0.5rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             max-width: 400px;
             width: 90%;
-            animation: slideIn 0.3s ease;
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
         }
 
         @keyframes fadeInModal {
@@ -195,58 +333,100 @@ $chartData = [
 
         @keyframes slideIn {
             from {
-                transform: translateY(-20px);
+                transform: translateY(-30px) scale(0.95);
                 opacity: 0;
             }
             to {
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
                 opacity: 1;
+            }
+        }
+
+        .stat-card.employees-card {
+            background: linear-gradient(135deg, #0d9488 0%, #14b8a6 50%, #0d9488 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        .stat-card.applicants-card {
+            background: linear-gradient(135deg, #0891b2 0%, #06b6d4 50%, #0891b2 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        .stat-card.events-card {
+            background: linear-gradient(135deg, #059669 0%, #10b981 50%, #059669 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        @media (max-width: 640px) {
+            .stat-number {
+                font-size: 2rem;
+            }
+            .stat-icon {
+                width: 40px;
+                height: 40px;
             }
         }
     </style>
 </head>
-<body class="bg-gray-100">
+<body>
     <div class="min-h-screen lg:ml-64">
-        <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg">
+        <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
-                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Dashboard</h1>
+                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">Dashboard</h1>
                 <button onclick="openLogoutModal()" 
-                   class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
-                    Logout
+                   class="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg font-semibold text-red-600 hover:text-red-700 hover:bg-white transition-all duration-200 text-xs sm:text-sm shadow-lg hover:shadow-xl transform hover:scale-105">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
                 </button>
             </div>
         </header>
 
         <main class="p-4 lg:p-8">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
-                <div class="stat-card bg-teal-700 text-white rounded-lg p-4 lg:p-6 shadow-lg" 
+                <div class="stat-card employees-card text-white rounded-xl p-5 lg:p-6 shadow-xl" 
                      data-chart="employees"
                      onclick="switchChart('employees')">
-                    <h3 class="text-base lg:text-lg font-semibold mb-2">Employees</h3>
-                    <p class="text-2xl lg:text-3xl font-bold"><?php echo $stats['employees']; ?></p>
-                    <p class="text-xs lg:text-sm opacity-80 mt-2">Total Employees</p>
+                    <div class="stat-icon">
+                        <i class="fas fa-users text-2xl"></i>
+                    </div>
+                    <h3 class="stat-title">Employees</h3>
+                    <p class="stat-number"><?php echo $stats['employees']; ?></p>
+                    <p class="stat-label">Total Employees</p>
                 </div>
 
-                <div class="stat-card bg-teal-700 text-white rounded-lg p-4 lg:p-6 shadow-lg" 
+                <div class="stat-card applicants-card text-white rounded-xl p-5 lg:p-6 shadow-xl" 
                      data-chart="applicants"
                      onclick="switchChart('applicants')">
-                    <h3 class="text-base lg:text-lg font-semibold mb-2">Applicants</h3>
-                    <p class="text-2xl lg:text-3xl font-bold"><?php echo $stats['applicants']; ?></p>
-                    <p class="text-xs lg:text-sm opacity-80 mt-2">Total Applicants</p>
+                    <div class="stat-icon">
+                        <i class="fas fa-user-tie text-2xl"></i>
+                    </div>
+                    <h3 class="stat-title">Applicants</h3>
+                    <p class="stat-number"><?php echo $stats['applicants']; ?></p>
+                    <p class="stat-label">Total Applicants</p>
                 </div>
 
-                <div class="stat-card bg-teal-700 text-white rounded-lg p-4 lg:p-6 shadow-lg sm:col-span-2 lg:col-span-1" 
+                <div class="stat-card events-card text-white rounded-xl p-5 lg:p-6 shadow-xl sm:col-span-2 lg:col-span-1" 
                      data-chart="events"
                      onclick="switchChart('events')">
-                    <h3 class="text-base lg:text-lg font-semibold mb-2">Events</h3>
-                    <p class="text-2xl lg:text-3xl font-bold"><?php echo $stats['events']; ?></p>
-                    <p class="text-xs lg:text-sm opacity-80 mt-2">Upcoming This Month</p>
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-alt text-2xl"></i>
+                    </div>
+                    <h3 class="stat-title">Events</h3>
+                    <p class="stat-number"><?php echo $stats['events']; ?></p>
+                    <p class="stat-label">Upcoming This Month</p>
                 </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6">
-                <h3 class="text-lg lg:text-xl font-bold text-gray-800 mb-4 lg:mb-6" id="chartTitle">NUMBER OF EMPLOYEES</h3>
+            <div class="chart-card p-6 lg:p-8">
+                <h3 class="chart-title" id="chartTitle">NUMBER OF EMPLOYEES</h3>
                 <div class="w-full overflow-x-auto">
                     <div class="min-w-[500px] chart-container">
                         <canvas id="mainChart" class="w-full"></canvas>
@@ -259,19 +439,24 @@ $chartData = [
     <!-- Logout Modal -->
     <div id="logoutModal" class="modal">
         <div class="modal-content">
-            <div class="bg-red-600 text-white p-4 rounded-t-lg">
-                <h2 class="text-xl font-bold">Confirm Logout</h2>
+            <div class="bg-gradient-to-r from-red-600 to-red-700 text-white p-5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                        <i class="fas fa-sign-out-alt text-xl"></i>
+                    </div>
+                    <h2 class="text-xl font-bold">Confirm Logout</h2>
+                </div>
             </div>
             <div class="p-6">
-                <p class="text-gray-700 mb-6">Are you sure you want to logout?</p>
+                <p class="text-gray-700 mb-6 text-center">Are you sure you want to logout?</p>
                 <div class="flex gap-3 justify-end">
                     <button onclick="closeLogoutModal()" 
-                            class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">
+                            class="px-5 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-all duration-200 font-medium shadow-sm hover:shadow">
                         Cancel
                     </button>
                     <a href="logout.php" 
-                       class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
-                        Logout
+                       class="px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg transform hover:scale-105">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
                     </a>
                 </div>
             </div>
@@ -317,20 +502,59 @@ $chartData = [
             responsive: true,
             maintainAspectRatio: true,
             animation: {
-                duration: 800,
+                duration: 1000,
                 easing: 'easeInOutQuart'
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        stepSize: 1
+                        stepSize: 1,
+                        font: {
+                            size: 12,
+                            weight: '500'
+                        },
+                        color: '#64748b'
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)',
+                        drawBorder: false
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 12,
+                            weight: '500'
+                        },
+                        color: '#64748b'
+                    },
+                    grid: {
+                        display: false
                     }
                 }
             },
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: {
+                        size: 14,
+                        weight: '600'
+                    },
+                    bodyFont: {
+                        size: 13
+                    },
+                    cornerRadius: 8,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            return context.parsed.y + ' ' + (context.parsed.y === 1 ? 'item' : 'items');
+                        }
+                    }
                 }
             }
         });
@@ -350,6 +574,11 @@ $chartData = [
                 // Use yearly labels for employees, monthly for others
                 const labels = config.isYearly ? config.labels : chartConfig.months;
                 
+                // Create gradient for chart bars
+                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                gradient.addColorStop(0, config.color + 'CC');
+                gradient.addColorStop(1, config.color + '66');
+                
                 currentChart = new Chart(ctx, {
                     type: 'bar',
                     data: {
@@ -357,9 +586,13 @@ $chartData = [
                         datasets: [{
                             label: config.label,
                             data: config.data,
-                            backgroundColor: config.color + '33',
+                            backgroundColor: gradient,
                             borderColor: config.color,
-                            borderWidth: 1
+                            borderWidth: 2,
+                            borderRadius: 8,
+                            borderSkipped: false,
+                            barThickness: 'flex',
+                            maxBarThickness: 50
                         }]
                     },
                     options: getChartOptions()

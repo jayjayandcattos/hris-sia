@@ -1,12 +1,28 @@
 <style>
+    header {
+        position: relative !important;
+    }
+
     #mobile-menu-btn {
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         backdrop-filter: blur(10px);
         background: rgba(0, 54, 49, 0.9) !important;
+        position: absolute;
+        z-index: 100;
+        top: 50%;
+        left: 12px;
+        transform: translateY(-50%);
+        will-change: opacity, visibility;
+    }
+
+    #mobile-menu-btn.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
     }
 
     #mobile-menu-btn:hover {
-        transform: scale(1.1);
+        transform: translateY(-50%) scale(1.1);
         background: rgba(0, 77, 69, 0.95) !important;
         box-shadow: 0 8px 25px rgba(0, 77, 69, 0.3);
     }
@@ -15,12 +31,26 @@
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         box-shadow: 0 0 40px rgba(0, 0, 0, 0.1);
         backdrop-filter: blur(20px);
+        z-index: 50 !important;
     }
 
     #sidebar-overlay {
         background: rgba(0, 0, 0, 0.4);
         backdrop-filter: blur(4px);
         transition: opacity 0.3s ease;
+        z-index: 40 !important;
+    }
+
+    @media (max-width: 1023px) {
+        .min-h-screen {
+            position: relative;
+            z-index: 1;
+        }
+        
+        header {
+            position: relative;
+            z-index: 10;
+        }
     }
 
     #close-sidebar {
@@ -137,8 +167,12 @@
         }
 
         #mobile-menu-btn {
-            top: 16px;
-            left: 16px;
+            top: 50%;
+            left: 12px;
+            position: absolute;
+            transform: translateY(-50%);
+            z-index: 100;
+            will-change: opacity, visibility;
         }
 
         #sidebar nav a {
@@ -198,17 +232,17 @@
     }
 </style>
 
-<button id="mobile-menu-btn" class="lg:hidden absolute left-4 -mt-1.5 bg-teal-600 text-white p-2.5 rounded-lg shadow-lg hover:bg-teal-700 transition-colors">
+<button id="mobile-menu-btn" class="lg:hidden bg-teal-600 text-white p-2.5 rounded-lg shadow-lg hover:bg-teal-700 transition-colors">
     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
     </svg>
 </button>
 
 
-<div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden lg:hidden transition-opacity"></div>
+<div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden transition-opacity"></div>
 
 
-<aside id="sidebar" class="w-64 bg-white shadow-lg h-screen fixed left-0 top-0 z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out overflow-y-auto">
+<aside id="sidebar" class="w-64 bg-white shadow-lg h-screen fixed left-0 top-0 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out overflow-y-auto">
 
     <button id="close-sidebar" class="lg:hidden absolute top-4 right-4 text-gray-600 hover:text-gray-800 p-1">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -266,12 +300,18 @@
         sidebar.classList.remove('-translate-x-full');
         overlay.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
+        if (mobileMenuBtn) {
+            mobileMenuBtn.classList.add('hidden');
+        }
     }
 
     function closeSidebarFunc() {
         sidebar.classList.add('-translate-x-full');
         overlay.classList.add('hidden');
         document.body.style.overflow = '';
+        if (mobileMenuBtn) {
+            mobileMenuBtn.classList.remove('hidden');
+        }
     }
 
 

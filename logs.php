@@ -87,7 +87,37 @@ try {
     <title>HRIS - System Logs</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        body {
+            background: linear-gradient(135deg, #f0fdfa 0%, #e0f2f1 50%, #f8fafc 100%);
+            background-attachment: fixed;
+        }
+
+        .header-gradient {
+            background: linear-gradient(135deg, #003631 0%, #004d45 50%, #002b27 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(236, 72, 153, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .header-gradient > * {
+            position: relative;
+            z-index: 1;
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -96,7 +126,8 @@ try {
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
             animation: fadeInModal 0.3s ease;
         }
 
@@ -109,9 +140,10 @@ try {
         .modal-content {
             background-color: white;
             padding: 0;
-            border-radius: 0.5rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            animation: slideIn 0.3s ease;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
         }
 
         @keyframes fadeInModal {
@@ -121,37 +153,50 @@ try {
 
         @keyframes slideIn {
             from {
-                transform: translateY(-20px);
+                transform: translateY(-30px) scale(0.95);
                 opacity: 0;
             }
             to {
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
                 opacity: 1;
             }
+        }
+
+        .card-enhanced {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .card-enhanced:hover {
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
         }
     </style>
 </head>
 
-<body class="bg-gray-100">
+<body>
     <div class="min-h-screen lg:ml-64">
-        <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg no-print">
+        <header class="header-gradient text-white p-4 lg:p-6 shadow-xl no-print">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
-                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">System Logs</h1>
-                <button onclick="openLogoutModal()" class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
-                    Logout
+                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">
+                    <i class="fas fa-file-alt mr-2"></i>System Logs
+                </h1>
+                <button onclick="openLogoutModal()" class="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg font-semibold text-red-600 hover:text-red-700 hover:bg-white transition-all duration-200 text-xs sm:text-sm shadow-lg hover:shadow-xl transform hover:scale-105">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
                 </button>
             </div>
         </header>
 
         <main class="p-3 sm:p-4 lg:p-8 print-content">
-            <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6 mb-4 lg:mb-6 no-print">
+            <div class="card-enhanced p-4 lg:p-6 mb-4 lg:mb-6 no-print">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-lg font-semibold text-gray-800">Filter Logs</h2>
-                    <button onclick="window.print()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
-                        </svg>
+                    <button onclick="window.print()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-200">
+                        <i class="fas fa-print"></i>
                         Print
                     </button>
                 </div>
@@ -222,7 +267,7 @@ try {
                 <hr class="my-4">
             </div>
 
-            <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6">
+            <div class="card-enhanced p-4 lg:p-6">
                 <div class="mb-4 flex justify-between items-center no-print">
                     <h2 class="text-lg font-semibold text-gray-800">
                         Log Entries <span class="text-sm text-gray-500">(Showing <?php echo count($logs); ?> entries)</span>

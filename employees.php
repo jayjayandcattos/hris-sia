@@ -206,7 +206,36 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
     <title>HRIS - Employees</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        body {
+            background: linear-gradient(135deg, #f0fdfa 0%, #e0f2f1 50%, #f8fafc 100%);
+            background-attachment: fixed;
+        }
+
+        .header-gradient {
+            background: linear-gradient(135deg, #003631 0%, #004d45 50%, #002b27 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(236, 72, 153, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .header-gradient > * {
+            position: relative;
+            z-index: 1;
+        }
         @media (max-width: 768px) {
             .mobile-card {
                 display: block;
@@ -229,11 +258,18 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
 
         .tab-button {
             transition: all 0.3s ease;
+            position: relative;
         }
 
         .tab-button.active {
-            background-color: #0d9488;
+            background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
             color: white;
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+        }
+
+        .tab-button:hover:not(.active) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
         .modal {
@@ -244,7 +280,8 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
             animation: fadeInModal 0.3s ease;
         }
 
@@ -257,9 +294,12 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
         .modal-content {
             background-color: white;
             padding: 0;
-            border-radius: 0.5rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            animation: slideIn 0.3s ease;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            max-width: 90%;
+            width: 500px;
         }
 
         @keyframes fadeInModal {
@@ -269,25 +309,82 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
 
         @keyframes slideIn {
             from {
-                transform: translateY(-20px);
+                transform: translateY(-30px) scale(0.95);
                 opacity: 0;
             }
             to {
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
                 opacity: 1;
             }
+        }
+
+        .card-enhanced {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .card-enhanced:hover {
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(13, 148, 136, 0.3);
+        }
+
+        .btn-secondary {
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        input[type="text"], input[type="email"], input[type="date"], select {
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        input[type="text"]:focus, input[type="email"]:focus, input[type="date"]:focus, select:focus {
+            border-color: #0d9488;
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+        }
+
+        table thead {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+
+        table tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        table tbody tr:hover {
+            background: #f8fafc;
+            transform: scale(1.01);
         }
     </style>
 </head>
 
-<body class="bg-gray-100">
+<body>
     <div class="min-h-screen lg:ml-64">
-        <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg">
+        <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
-                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Employee Management</h1>
-                <button onclick="openLogoutModal()" class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
-                    Logout
+                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">
+                    <i class="fas fa-users mr-2"></i>Employee Management
+                </h1>
+                <button onclick="openLogoutModal()" class="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg font-semibold text-red-600 hover:text-red-700 hover:bg-white transition-all duration-200 text-xs sm:text-sm shadow-lg hover:shadow-xl transform hover:scale-105">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
                 </button>
             </div>
         </header>
@@ -299,7 +396,7 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                 </div>
             <?php endif; ?>
 
-            <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6 mb-4 lg:mb-6">
+            <div class="card-enhanced p-4 lg:p-6 mb-4 lg:mb-6">
                 <div class="flex flex-wrap gap-2 mb-4">
                     <a href="?view=active" class="tab-button px-4 py-2 rounded-lg font-medium text-sm <?php echo $view === 'active' ? 'active' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'; ?>">
                         Active Employees
@@ -321,15 +418,15 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                         placeholder="Filter by Department"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
                     <div class="flex gap-2">
-                        <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium text-sm">
-                            Search
+                        <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200">
+                            <i class="fas fa-search mr-2"></i>Search
                         </button>
-                        <button type="button" onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium text-sm">
-                            Clear
+                        <button type="button" onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200">
+                            <i class="fas fa-times mr-2"></i>Clear
                         </button>
                         <?php if ($view === 'active'): ?>
-                        <button type="button" onclick="openAddModal()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
-                            + Add Employee
+                        <button type="button" onclick="openAddModal()" class="btn-primary text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
+                            <i class="fas fa-plus mr-2"></i>Add Employee
                         </button>
                         <?php endif; ?>
                     </div>
@@ -368,17 +465,17 @@ $positions = fetchAll($conn, "SELECT * FROM position ORDER BY position_title");
                                             <div class="flex gap-2">
                                                 <?php if ($view === 'active'): ?>
                                                     <button onclick='editEmployee(<?php echo json_encode($emp); ?>)'
-                                                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
-                                                        Edit
+                                                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200">
+                                                        <i class="fas fa-edit mr-1"></i>Edit
                                                     </button>
                                                     <button onclick="openArchiveModal(<?php echo $emp['employee_id']; ?>, '<?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?>')"
-                                                        class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs">
-                                                        Archive
+                                                        class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200">
+                                                        <i class="fas fa-archive mr-1"></i>Archive
                                                     </button>
                                                 <?php else: ?>
                                                     <button onclick="openUnarchiveModal(<?php echo $emp['employee_id']; ?>, '<?php echo htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']); ?>')"
-                                                        class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">
-                                                        Restore
+                                                        class="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200">
+                                                        <i class="fas fa-undo mr-1"></i>Restore
                                                     </button>
                                                 <?php endif; ?>
                                             </div>

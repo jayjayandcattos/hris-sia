@@ -151,8 +151,108 @@ if ($date_filter == date('Y-m-d')) {
     <title>HRIS - Attendance</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
+        body {
+            background: linear-gradient(135deg, #f0fdfa 0%, #e0f2f1 50%, #f8fafc 100%);
+            background-attachment: fixed;
+        }
+
+        .header-gradient {
+            background: linear-gradient(135deg, #003631 0%, #004d45 50%, #002b27 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(236, 72, 153, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .header-gradient > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .stat-card {
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-card.present-card {
+            background: linear-gradient(135deg, #10b981 0%, #34d399 50%, #10b981 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        .stat-card.absent-card {
+            background: linear-gradient(135deg, #ef4444 0%, #f87171 50%, #ef4444 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        .stat-card.leave-card {
+            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #f59e0b 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover .stat-icon {
+            transform: scale(1.1) rotate(5deg);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -161,7 +261,8 @@ if ($date_filter == date('Y-m-d')) {
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
             animation: fadeInModal 0.3s ease;
         }
 
@@ -174,45 +275,54 @@ if ($date_filter == date('Y-m-d')) {
         .modal-content {
             background-color: white;
             padding: 0;
-            border-radius: 0.5rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            animation: slideIn 0.3s ease;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
         }
 
         @keyframes fadeInModal {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         @keyframes slideIn {
             from {
-                transform: translateY(-20px);
+                transform: translateY(-30px) scale(0.95);
                 opacity: 0;
             }
-
             to {
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
                 opacity: 1;
             }
+        }
+
+        .card-enhanced {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .card-enhanced:hover {
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
         }
     </style>
 </head>
 
-<body class="bg-gray-100">
-
+<body>
     <div class="min-h-screen lg:ml-64">
-        <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg">
+        <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
-                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Attendance</h1>
+                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">
+                    <i class="fas fa-clock mr-2"></i>Attendance
+                </h1>
                 <button onclick="openLogoutModal()"
-                    class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
-                    Logout
+                    class="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg font-semibold text-red-600 hover:text-red-700 hover:bg-white transition-all duration-200 text-xs sm:text-sm shadow-lg hover:shadow-xl transform hover:scale-105">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
                 </button>
             </div>
         </header>
@@ -233,21 +343,30 @@ if ($date_filter == date('Y-m-d')) {
             <?php endif; ?>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-4 lg:mb-6">
-                <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6">
-                    <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">Present</h3>
+                <div class="stat-card present-card text-white rounded-xl p-5 lg:p-6 shadow-xl">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle text-2xl"></i>
+                    </div>
+                    <h3 class="text-xs sm:text-sm font-semibold mb-2">Present</h3>
                     <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $present; ?></p>
                 </div>
-                <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6">
-                    <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">Absent</h3>
+                <div class="stat-card absent-card text-white rounded-xl p-5 lg:p-6 shadow-xl">
+                    <div class="stat-icon">
+                        <i class="fas fa-times-circle text-2xl"></i>
+                    </div>
+                    <h3 class="text-xs sm:text-sm font-semibold mb-2">Absent</h3>
                     <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $absent; ?></p>
                 </div>
-                <div class="bg-teal-700 text-white rounded-lg shadow-lg p-4 lg:p-6">
-                    <h3 class="text-xs sm:text-sm font-medium opacity-90 mb-2">Leave</h3>
+                <div class="stat-card leave-card text-white rounded-xl p-5 lg:p-6 shadow-xl">
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-times text-2xl"></i>
+                    </div>
+                    <h3 class="text-xs sm:text-sm font-semibold mb-2">Leave</h3>
                     <p class="text-2xl sm:text-3xl lg:text-4xl font-bold"><?php echo $leave; ?></p>
                 </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6 mb-4 lg:mb-6">
+            <div class="card-enhanced p-4 lg:p-6 mb-4 lg:mb-6">
                 <form method="GET" id="filterForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                     <input type="date" name="date" value="<?php echo htmlspecialchars($date_filter); ?>"
                         onchange="this.form.submit()"
@@ -261,17 +380,15 @@ if ($date_filter == date('Y-m-d')) {
                         onchange="this.form.submit()"
                         class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
                     <div class="flex gap-2">
-                        <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm transition-colors">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
+                        <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg transition-all duration-200">
+                            <i class="fas fa-search"></i>
                             <span class="hidden sm:inline">Search</span>
                         </button>
-                        <button type="button" onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors">
-                            Clear
+                        <button type="button" onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center">
+                            <i class="fas fa-times mr-2"></i>Clear
                         </button>
-                        <button type="button" onclick="exportAttendance()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors">
-                            Export
+                        <button type="button" onclick="exportAttendance()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all duration-200">
+                            <i class="fas fa-download mr-2"></i>Export
                         </button>
                     </div>
                 </form>
@@ -310,8 +427,8 @@ if ($date_filter == date('Y-m-d')) {
                                         <td class="px-3 py-2">
                                             <?php if (!$record['time_out']): ?>
                                                 <button type="button" onclick="showConfirmTimeOut(<?php echo htmlspecialchars($record['attendance_id']); ?>)" 
-                                                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                    Time Out
+                                                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-200">
+                                                    <i class="fas fa-sign-out-alt mr-1"></i>Time Out
                                                 </button>
                                             <?php else: ?>
                                                 <span class="text-green-600 text-xs font-medium">✓ Complete</span>

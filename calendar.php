@@ -135,8 +135,38 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
     <title>HRIS - Calendar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
+        body {
+            background: linear-gradient(135deg, #f0fdfa 0%, #e0f2f1 50%, #f8fafc 100%);
+            background-attachment: fixed;
+        }
+
+        .header-gradient {
+            background: linear-gradient(135deg, #003631 0%, #004d45 50%, #002b27 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(236, 72, 153, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .header-gradient > * {
+            position: relative;
+            z-index: 1;
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -145,8 +175,16 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
             animation: fadeInModal 0.3s ease;
+        }
+
+        @media (max-width: 1023px) {
+            main {
+                position: relative;
+                z-index: 1;
+            }
         }
 
         .modal.active {
@@ -158,44 +196,54 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
         .modal-content {
             background-color: white;
             padding: 0;
-            border-radius: 0.5rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            animation: slideIn 0.3s ease;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
         }
 
         @keyframes fadeInModal {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         @keyframes slideIn {
             from {
-                transform: translateY(-20px);
+                transform: translateY(-30px) scale(0.95);
                 opacity: 0;
             }
-
             to {
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
                 opacity: 1;
             }
+        }
+
+        .card-enhanced {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .card-enhanced:hover {
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
         }
     </style>
 </head>
 
-<body class="bg-gray-100">
+<body>
     <div class="min-h-screen lg:ml-64">
-        <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg">
+        <header class="header-gradient text-white p-4 lg:p-6 shadow-xl">
             <div class="flex items-center justify-between pl-14 lg:pl-0">
                 <?php include 'includes/sidebar.php'; ?>
-                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold">Calendar</h1>
+                <h1 class="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight">
+                    <i class="fas fa-calendar-alt mr-2"></i>Calendar
+                </h1>
                 <button onclick="openLogoutModal()"
-                    class="bg-white px-3 py-2 rounded-lg font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 text-xs sm:text-sm">
-                    Logout
+                    class="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg font-semibold text-red-600 hover:text-red-700 hover:bg-white transition-all duration-200 text-xs sm:text-sm shadow-lg hover:shadow-xl transform hover:scale-105">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
                 </button>
             </div>
         </header>
@@ -208,31 +256,27 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
             <?php endif; ?>
 
             <!-- Calendar Controls -->
-            <div class="bg-white rounded-lg shadow-lg p-4 lg:p-6 mb-4 lg:mb-6">
+            <div class="card-enhanced p-4 lg:p-6 mb-4 lg:mb-6">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                     <div class="flex items-center gap-3">
-                        <button onclick="changeView('yearly')" id="viewYearlyBtn" class="bg-teal-700 text-white px-4 py-2 rounded-lg font-medium text-sm">
-                            Yearly
+                        <button onclick="changeView('yearly')" id="viewYearlyBtn" class="bg-teal-700 text-white px-4 py-2 rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200">
+                            <i class="fas fa-calendar mr-2"></i>Yearly
                         </button>
-                        <button onclick="changeView('monthly')" id="viewMonthlyBtn" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm">
-                            Monthly
+                        <button onclick="changeView('monthly')" id="viewMonthlyBtn" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200 hover:bg-gray-300">
+                            <i class="fas fa-calendar-week mr-2"></i>Monthly
                         </button>
                     </div>
 
                     <div class="flex items-center gap-3 w-full sm:w-auto">
-                        <button onclick="previousPeriod()" class="bg-teal-700 hover:bg-teal-800 text-white px-3 py-2 rounded-lg">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                            </svg>
+                        <button onclick="previousPeriod()" class="bg-teal-700 hover:bg-teal-800 text-white px-3 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200">
+                            <i class="fas fa-chevron-left"></i>
                         </button>
                         <h2 id="calendarTitle" class="text-xl sm:text-2xl font-bold text-gray-800 flex-1 text-center">2025</h2>
-                        <button onclick="nextPeriod()" class="bg-teal-700 hover:bg-teal-800 text-white px-3 py-2 rounded-lg">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strok e-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                            </svg>
+                        <button onclick="nextPeriod()" class="bg-teal-700 hover:bg-teal-800 text-white px-3 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200">
+                            <i class="fas fa-chevron-right"></i>
                         </button>
-                        <button onclick="openAddEventModal()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
-                            + Add Event
+                        <button onclick="openAddEventModal()" class="bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all duration-200">
+                            <i class="fas fa-plus mr-2"></i>Add Event
                         </button>
                     </div>
                 </div>
@@ -265,7 +309,7 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
     </div>
 
     <!-- Add Event Modal -->
-    <div id="addEventModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div id="addEventModal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div class="p-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">Add Event</h3>
@@ -305,7 +349,7 @@ $departments = fetchAll($conn, "SELECT * FROM department ORDER BY department_nam
     </div>
 
     <!-- Edit Event Modal -->
-    <div id="editEventModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div id="editEventModal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div class="p-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">Edit Event</h3>
