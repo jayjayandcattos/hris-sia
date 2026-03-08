@@ -766,6 +766,67 @@ try {
         </div>
     </div>
 
+    <!-- Negative Salary Reason Modal -->
+    <div id="negativeSalaryModal" class="modal">
+        <div class="modal-content max-w-2xl w-full mx-4">
+            <div class="bg-red-700 text-white p-4 rounded-t-lg">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-bold">
+                        <i class="fas fa-exclamation-circle mr-2"></i>Negative Salary Notice
+                    </h2>
+                    <button onclick="closeNegativeSalaryModal()" class="text-white hover:text-gray-200 text-2xl">&times;</button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-info-circle text-red-500"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-red-700 font-semibold mb-1">Why is your salary negative?</p>
+                            <p class="text-xs text-red-600">
+                                Your net pay for this period is negative because your deductions (primarily from absences or lack of attendance) exceed your gross earnings. Please review your attendance record below for this period.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h3 class="text-md font-bold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-calendar-alt text-teal-600 mr-2"></i>Attendance Log for Period
+                    </h3>
+                    <div id="negativeSalaryAttendanceLoading" class="text-center py-4">
+                        <i class="fas fa-spinner fa-spin text-teal-600 mb-2"></i>
+                        <p class="text-xs text-gray-500">Fetching attendance records...</p>
+                    </div>
+                    <div class="overflow-x-auto max-h-[300px] overflow-y-auto">
+                        <table class="w-full text-xs" id="negativeSalaryAttendanceTable">
+                            <thead>
+                                <tr class="bg-gray-100 border-b">
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-700 uppercase">Date</th>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-700 uppercase">Status</th>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-700 uppercase">In/Out</th>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-700 uppercase">Hours</th>
+                                </tr>
+                            </thead>
+                            <tbody id="negativeSalaryAttendanceList">
+                                <!-- Records will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end">
+                    <button onclick="closeNegativeSalaryModal()"
+                        class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-semibold">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function openLeaveModal() {
             document.getElementById('leaveModal').classList.add('active');
@@ -1033,6 +1094,10 @@ try {
                     '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 ml-2">Calculated (Not Finalized)</span>' : 
                     '';
                 
+                const netPay = parseFloat(payslip.net_pay);
+                const isNegative = netPay < 0;
+                const netPayClass = isNegative ? 'text-red-700' : 'text-blue-700';
+                
                 html += `
                     <div class="mb-6 border border-gray-200 rounded-lg overflow-hidden ${index > 0 ? 'mt-6' : ''}">
                         <!-- Payslip Header -->
@@ -1099,10 +1164,18 @@ try {
                             </div>
                             
                             <!-- Net Pay Section -->
-                            <div class="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
+                            <div class="bg-blue-50 rounded-lg p-4 border-2 border-blue-200 ${isNegative ? 'bg-red-50 border-red-200' : ''}">
                                 <div class="flex justify-between items-center">
-                                    <span class="text-lg font-bold text-gray-800">Net Pay</span>
-                                    <span class="text-2xl font-bold text-blue-700">₱${parseFloat(payslip.net_pay).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-lg font-bold text-gray-800">Net Pay</span>
+                                        ${isNegative ? `
+                                            <button onclick='showNegativeSalaryReason(${JSON.stringify(payslip).replace(/'/g, "&apos;")})' 
+                                                    class="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 transition flex items-center gap-1">
+                                                <i class="fas fa-question-circle"></i> Why is this negative?
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                    <span class="text-2xl font-bold ${netPayClass}">₱${netPay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         </div>
@@ -1167,6 +1240,72 @@ try {
                     closePayslipModal();
                 }
             });
+        }
+        
+        // Negative Salary Modal Functions
+        function openNegativeSalaryModal() {
+            document.getElementById('negativeSalaryModal').classList.add('active');
+        }
+
+        function closeNegativeSalaryModal() {
+            document.getElementById('negativeSalaryModal').classList.remove('active');
+        }
+
+        function showNegativeSalaryReason(payslip) {
+            openNegativeSalaryModal();
+            
+            // Show loading state
+            document.getElementById('negativeSalaryAttendanceLoading').style.display = 'block';
+            document.getElementById('negativeSalaryAttendanceList').innerHTML = '';
+            
+            // Fetch attendance for the period
+            const apiUrl = '../api/attendance_check.php?action=get_period_attendance&employee_id=' + employeeId + 
+                           '&period_start=' + payslip.period_start + '&period_end=' + payslip.period_end;
+            
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('negativeSalaryAttendanceLoading').style.display = 'none';
+                    
+                    if (data.success && data.data && data.data.length > 0) {
+                        renderNegativeSalaryAttendance(data.data);
+                    } else {
+                        document.getElementById('negativeSalaryAttendanceList').innerHTML = 
+                            '<tr><td colspan="4" class="px-3 py-4 text-center text-gray-500">No attendance records found for this period.</td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching attendance:', error);
+                    document.getElementById('negativeSalaryAttendanceLoading').style.display = 'none';
+                    document.getElementById('negativeSalaryAttendanceList').innerHTML = 
+                        '<tr><td colspan="4" class="px-3 py-4 text-center text-red-500">Error loading attendance data.</td></tr>';
+                });
+        }
+
+        function renderNegativeSalaryAttendance(records) {
+            let html = '';
+            records.forEach(record => {
+                const date = new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const timeIn = record.time_in ? new Date('1970-01-01T' + record.time_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '---';
+                const timeOut = record.time_out ? new Date('1970-01-01T' + record.time_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '---';
+                
+                let statusClass = 'bg-gray-100 text-gray-800';
+                if (record.status === 'Present') statusClass = 'bg-green-100 text-green-800';
+                else if (record.status === 'Absent') statusClass = 'bg-red-100 text-red-800';
+                else if (record.status === 'Late') statusClass = 'bg-yellow-100 text-yellow-800';
+                
+                html += `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-3 py-2 text-gray-800 font-medium">${date}</td>
+                        <td class="px-3 py-2">
+                            <span class="px-2 py-0.5 rounded-full ${statusClass}">${record.status}</span>
+                        </td>
+                        <td class="px-3 py-2 text-gray-600">${timeIn} - ${timeOut}</td>
+                        <td class="px-3 py-2 text-gray-800 font-semibold">${record.total_hours ? parseFloat(record.total_hours).toFixed(1) + 'h' : '0.0h'}</td>
+                    </tr>
+                `;
+            });
+            document.getElementById('negativeSalaryAttendanceList').innerHTML = html;
         }
     </script>
 </body>
